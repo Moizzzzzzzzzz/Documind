@@ -9,8 +9,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY api/ ./api/
 COPY core/ ./core/
 COPY services/ ./services/
-COPY data/ ./data/
 COPY main.py .
+
+# Create the data directories fresh — never copy local dev data (which can
+# contain a stale FAISS index) into the image.
+RUN mkdir -p /app/data/uploads /app/data/vector_store
 
 EXPOSE 8000
 

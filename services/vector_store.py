@@ -44,22 +44,32 @@ def _sync_upsert_index(chunks: List[Document]) -> None:
 
     Runs in a single thread via asyncio.to_thread. The _index_lock ensures
     that concurrent uploads or queries never observe a half-written index.
+
+    IMPORTANT: We always reload from disk before appending. This is the only
+    way to stay correct when multiple container instances each have separate
+    in-memory state — disk is the single source of truth.
     """
     global _index
 
     Path(VECTOR_STORE_PATH).mkdir(parents=True, exist_ok=True)
 
     with _index_lock:
-        if _index is None:
-            # Try to warm the in-memory index from a previous run's disk snapshot.
-            _index = _load_from_disk()
+        # Always reload from disk first — disk is authoritative.
+        # If another process/instance already wrote vectors here, we must
+        # merge from that snapshot before adding new chunks. Without this,
+        # a second upload handled by a fresh process would discard everything
+        # the first upload wrote and create a brand-new one-document index.
+        disk_index = _load_from_disk()
+        if disk_index is not None:
+            _index = disk_index
+            print(f"[VS DEBUG] Reloaded index from disk. Vectors on disk: {_index.index.ntotal}")
 
         if _index is None:
-            # First document ever — initialise a brand-new index.
+            # No prior data anywhere — create a brand-new index.
             print(f"[VS DEBUG] Creating new FAISS index with {len(chunks)} chunks.")
             _index = FAISS.from_documents(chunks, embeddings)
         else:
-            # Subsequent document — APPEND to the existing in-memory index.
+            # Append to the merged in-memory index.
             # add_documents mutates _index in-place; do NOT reassign _index.
             doc_count_before = _index.index.ntotal
             _index.add_documents(chunks)
@@ -92,8 +102,11 @@ def _sync_search(query: str, top_k: int) -> list[dict]:
     global _index
 
     with _index_lock:
-        if _index is None:
-            _index = _load_from_disk()
+        # Always reload from disk so we pick up vectors written by any other
+        # process or container instance since the last time we checked.
+        disk_index = _load_from_disk()
+        if disk_index is not None:
+            _index = disk_index
 
         if _index is None:
             raise ValueError("No documents have been ingested yet.")
