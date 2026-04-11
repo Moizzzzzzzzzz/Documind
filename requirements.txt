@@ -1,0 +1,23 @@
+# Web framework
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+
+# LLM orchestration
+langchain==0.2.1
+langchain-community==0.2.1
+
+# Embeddings & vector store
+sentence-transformers==3.0.0
+faiss-cpu==1.8.0
+
+# Document parsing
+PyPDF2==3.0.1
+python-docx==1.1.2
+unstructured==0.14.4
+
+# Frontend
+streamlit==1.35.0
+
+# Utilities
+python-dotenv==1.0.1
+python-multipart==0.0.9
