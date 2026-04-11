@@ -1,4 +1,4 @@
-const BASE_URL = '/api'
+const BASE_URL = ''
 
 /**
  * Upload a file to POST /api/upload
