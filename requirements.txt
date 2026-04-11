@@ -20,4 +20,7 @@ streamlit==1.35.0
 
 # Utilities
 python-dotenv==1.0.1
-python-multipart==0.0.9
+langchain-google-genai
+langchain-text-splitters
+langchain-groq
+
