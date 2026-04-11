@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Any
 
@@ -7,6 +8,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 
 from services.memory import get_chat_history, save_chat_history
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -96,6 +99,25 @@ async def generate_rag_response(
     chat_history = get_chat_history(session_id)
     chain = _prompt | robust_llm
 
+    # --- DIAGNOSTIC LOGGING ---
+    print("\n" + "=" * 70)
+    print(f"[LLM DEBUG] Query: {query!r}")
+    print(f"[LLM DEBUG] Chunks received: {len(retrieved_chunks)}")
+    print("=== INJECTED CONTEXT ===")
+    print(context_str if context_str else "<EMPTY — no context was built>")
+    print("=== END INJECTED CONTEXT ===")
+
+    formatted_prompt = _prompt.format(
+        chat_history=chat_history,
+        context=context_str,
+        question=query,
+    )
+    print("=== LLM PROMPT ===")
+    print(formatted_prompt)
+    print("=== END LLM PROMPT ===")
+    print("=" * 70 + "\n")
+    # --------------------------
+
     try:
         result: Any = await chain.ainvoke(
             {
@@ -106,7 +128,10 @@ async def generate_rag_response(
         )
         # LangChain chat models return an AIMessage; extract plain text.
         answer: str = result.content if hasattr(result, "content") else str(result)
-    except Exception:
+        print(f"[LLM DEBUG] LLM answer: {answer[:300]!r}")
+    except Exception as exc:
+        logger.exception("[LLM DEBUG] LLM invocation failed: %s", exc)
+        print(f"[LLM DEBUG] ERROR — LLM invocation raised: {type(exc).__name__}: {exc}")
         answer = (
             "The AI servers are currently at capacity. "
             "Please try again after sometime."
