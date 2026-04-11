@@ -6,45 +6,27 @@ import {
   Upload,
   FileText,
   MessageSquare,
-  Users,
-  Archive,
-  Settings,
-  HardDrive,
-  HelpCircle,
   CheckCircle2,
   Loader2,
-  X,
 } from 'lucide-react'
+import ThemeToggle from './ThemeToggle'
 
-const NAV_ITEMS = [
-  { icon: MessageSquare, label: 'All Chats', active: true },
-  { icon: Users, label: 'Shared' },
-  { icon: Archive, label: 'Archive' },
-  { icon: Settings, label: 'Settings' },
-]
-
-const BOTTOM_ITEMS = [
-  { icon: HardDrive, label: 'Storage' },
-  { icon: HelpCircle, label: 'Help' },
-]
-
-export default function Sidebar({ documents, onUpload, onNewChat, fileInputRef: externalRef }) {
+export default function Sidebar({ documents, onUpload, onNewChat, onSelectSession, sessions = [], fileInputRef: externalRef }) {
   const internalRef = useRef(null)
   const fileInputRef = externalRef ?? internalRef
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState(null)
 
   const handleFiles = async (files) => {
     if (!files || files.length === 0) return
-    setUploadError(null)
     setUploading(true)
     try {
       for (const file of files) {
         await onUpload(file)
       }
+      toast.success('File uploaded successfully')
     } catch (err) {
-      setUploadError(err.message)
+      toast.error(err.message || 'Upload failed. Please try again.')
     } finally {
       setUploading(false)
     }
@@ -133,12 +115,6 @@ export default function Sidebar({ documents, onUpload, onNewChat, fileInputRef: 
           <p className="text-gray-600 text-[10px] text-center">
             PDF, DOCX up to 50MB
           </p>
-          {uploadError && (
-            <div className="absolute inset-x-2 -bottom-8 bg-red-900/80 text-red-300 text-[10px] rounded px-2 py-1 flex items-center gap-1 z-10">
-              <X size={10} />
-              {uploadError}
-            </div>
-          )}
         </div>
       </div>
 
@@ -170,44 +146,28 @@ export default function Sidebar({ documents, onUpload, onNewChat, fileInputRef: 
         </div>
       )}
 
-      {/* Navigation */}
-      <div className="px-3 pb-2 flex flex-col gap-0.5">
-        <p className="text-gray-600 text-[10px] uppercase tracking-widest px-1 mb-1">
-          Navigation
-        </p>
-        {NAV_ITEMS.map(({ icon: Icon, label, active }) => (
+      {/* Past Chats */}
+      <div className="px-3 pb-3 flex-1 flex flex-col gap-0.5 overflow-y-auto scrollbar-thin min-h-0">
+        {sessions.length > 0 && (
+          <p className="text-gray-600 text-[10px] uppercase tracking-widest px-1 mb-1 flex-shrink-0">
+            Past Chats
+          </p>
+        )}
+        {sessions.map((session) => (
           <button
-            key={label}
-            onClick={!active ? () => toast('Pro Feature: Coming in v2.0!', { icon: '🔒' }) : undefined}
-            className={`
-              flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-sm transition-colors text-left
-              ${active
-                ? 'bg-gray-800 text-white'
-                : 'text-gray-400 hover:bg-gray-900 hover:text-gray-200'
-              }
-            `}
+            key={session.id}
+            onClick={() => onSelectSession(session)}
+            className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors text-left"
           >
-            <Icon size={15} />
-            {label}
+            <MessageSquare size={14} className="flex-shrink-0" />
+            <span className="truncate">{session.title}</span>
           </button>
         ))}
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Bottom nav */}
-      <div className="px-3 pb-4 pt-2 border-t border-gray-800 flex flex-col gap-0.5">
-        {BOTTOM_ITEMS.map(({ icon: Icon, label }) => (
-          <button
-            key={label}
-            onClick={() => toast('Pro Feature: Coming in v2.0!', { icon: '🔒' })}
-            className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-900 hover:text-gray-200 transition-colors text-left"
-          >
-            <Icon size={15} />
-            {label}
-          </button>
-        ))}
+      {/* Theme Toggle */}
+      <div className="px-3 pb-4 pt-2 border-t border-gray-800 flex-shrink-0">
+        <ThemeToggle />
       </div>
     </aside>
   )

@@ -6,6 +6,7 @@ import TopNav from './components/TopNav'
 import ChatMessage from './components/ChatMessage'
 import ChatInput from './components/ChatInput'
 import EmptyState from './components/EmptyState'
+import toast from 'react-hot-toast'
 import { uploadFile, sendChat } from './api'
 
 // Stable session_id for the lifetime of the page
@@ -13,11 +14,22 @@ const SESSION_ID = uuidv4()
 
 export default function App() {
   const [documents, setDocuments] = useState([])
-  const [messages, setMessages] = useState([])
-  const [isChatLoading, setIsChatLoading] = useState(false)
+  // Independent state per tab to prevent message bleed
+  const [ragMessages, setRagMessages] = useState([])
+  const [analysisMessages, setAnalysisMessages] = useState([])
+  const [isRagLoading, setIsRagLoading] = useState(false)
+  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('Documents')
+  const [sessions, setSessions] = useState([])
   const chatEndRef = useRef(null)
   const sidebarFileInputRef = useRef(null)
+
+  // Derive the active state slices from the current tab
+  const isDocumentsTab = activeTab === 'Documents'
+  const messages = isDocumentsTab ? ragMessages : analysisMessages
+  const isChatLoading = isDocumentsTab ? isRagLoading : isAnalysisLoading
+  const setMessages = isDocumentsTab ? setRagMessages : setAnalysisMessages
+  const setIsChatLoading = isDocumentsTab ? setIsRagLoading : setIsAnalysisLoading
 
   // Auto-scroll chat to bottom on new messages
   useEffect(() => {
@@ -35,16 +47,20 @@ export default function App() {
   }, [])
 
   const handleSend = useCallback(async (query) => {
-    // Append user message immediately
-    setMessages((prev) => [
+    // Capture the correct setters for the tab that is active at call time
+    const isRag = activeTab === 'Documents'
+    const appendMsg = isRag ? setRagMessages : setAnalysisMessages
+    const setLoading = isRag ? setIsRagLoading : setIsAnalysisLoading
+
+    appendMsg((prev) => [
       ...prev,
       { id: uuidv4(), role: 'user', content: query, timestamp: new Date() },
     ])
-    setIsChatLoading(true)
+    setLoading(true)
 
     try {
       const data = await sendChat(query, SESSION_ID)
-      setMessages((prev) => [
+      appendMsg((prev) => [
         ...prev,
         {
           id: uuidv4(),
@@ -55,23 +71,50 @@ export default function App() {
         },
       ])
     } catch (err) {
-      setMessages((prev) => [
+      toast.error(err.message || 'Something went wrong. Please try again.')
+      appendMsg((prev) => [
         ...prev,
         {
           id: uuidv4(),
           role: 'assistant',
-          content: `Sorry, something went wrong: ${err.message}`,
+          isError: true,
+          content: err.message || 'Something went wrong. Please try again.',
           sources: [],
           timestamp: new Date(),
         },
       ])
     } finally {
-      setIsChatLoading(false)
+      setLoading(false)
     }
-  }, [])
+  }, [activeTab])
 
   const handleNewChat = () => {
-    setMessages([])
+    const currentMessages = isDocumentsTab ? ragMessages : analysisMessages
+    if (currentMessages.length > 0) {
+      const firstUserMsg = currentMessages.find((m) => m.role === 'user')
+      const title = firstUserMsg
+        ? firstUserMsg.content.slice(0, 40) + (firstUserMsg.content.length > 40 ? '…' : '')
+        : 'Chat'
+      setSessions((prev) => [
+        { id: uuidv4(), title, messages: currentMessages, tab: activeTab, timestamp: new Date() },
+        ...prev,
+      ])
+    }
+    if (isDocumentsTab) {
+      setRagMessages([])
+    } else {
+      setAnalysisMessages([])
+    }
+  }
+
+  const handleSelectSession = (session) => {
+    setSessions((prev) => prev.filter((s) => s.id !== session.id))
+    setActiveTab(session.tab)
+    if (session.tab === 'Documents') {
+      setRagMessages(session.messages)
+    } else {
+      setAnalysisMessages(session.messages)
+    }
   }
 
   const handleTopUploadClick = () => {
@@ -80,17 +123,19 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen w-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
       <Toaster position="bottom-right" toastOptions={{ style: { fontSize: '13px' } }} />
       <Sidebar
         documents={documents}
         onUpload={handleUpload}
         onNewChat={handleNewChat}
+        onSelectSession={handleSelectSession}
+        sessions={sessions}
         fileInputRef={sidebarFileInputRef}
       />
 
       {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white">
+      <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-900">
         <TopNav
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -114,9 +159,9 @@ export default function App() {
                     <span className="text-white text-[10px] font-bold">AI</span>
                   </div>
                   <div className="flex items-center gap-1 pt-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.3s]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.15s]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:-0.3s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:-0.15s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce" />
                   </div>
                 </div>
               )}

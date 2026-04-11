@@ -17,7 +17,7 @@ def parse_pdf(file_path: Path, filename: str) -> List[dict]:
                 text = (page.extract_text() or "").strip()
                 if not text:
                     continue
-                pages.append({"text": text, "metadata": {"source": filename, "page": page_num}})
+                pages.append({"text": text, "metadata": {"source_file": filename, "page_number": page_num}})
         return pages
     except (PdfReadError, PdfStreamError) as e:
         raise ValueError(f"Failed to parse PDF: {e}") from e
@@ -33,7 +33,7 @@ def parse_docx(file_path: Path, filename: str) -> List[dict]:
                 continue
             # Heuristic: python-docx has no page boundary API; approximate at 10 paragraphs/page
             page = (para_index // 10) + 1
-            pages.append({"text": text, "metadata": {"source": filename, "page": page}})
+            pages.append({"text": text, "metadata": {"source_file": filename, "page_number": page}})
         return pages
     except Exception as e:
         raise ValueError(f"Failed to parse DOCX: {e}") from e
@@ -45,7 +45,7 @@ def parse_txt(file_path: Path, filename: str) -> List[dict]:
             text = f.read().strip()
         if not text:
             return []
-        return [{"text": text, "metadata": {"source": filename, "page": 1}}]
+        return [{"text": text, "metadata": {"source_file": filename, "page_number": 1}}]
     except OSError as e:
         raise ValueError(f"Failed to parse TXT: {e}") from e
 

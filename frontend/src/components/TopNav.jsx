@@ -14,7 +14,7 @@ export default function TopNav({ activeTab, setActiveTab, onUploadClick }) {
   }
 
   return (
-    <header className="h-14 border-b border-gray-200 flex items-center px-6 gap-6 flex-shrink-0 bg-white">
+    <header className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center px-6 gap-6 flex-shrink-0 bg-white dark:bg-gray-900">
       {/* Tabs */}
       <nav className="flex items-center gap-1 h-full">
         {TABS.map((tab) => (
@@ -24,8 +24,8 @@ export default function TopNav({ activeTab, setActiveTab, onUploadClick }) {
             className={`
               h-full px-3 text-sm font-medium border-b-2 transition-colors
               ${activeTab === tab
-                ? 'border-gray-900 text-gray-900'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-gray-900 text-gray-900 dark:border-gray-100 dark:text-gray-100'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
               }
             `}
           >
@@ -39,18 +39,18 @@ export default function TopNav({ activeTab, setActiveTab, onUploadClick }) {
 
       {/* Search */}
       <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
         <input
           type="text"
           placeholder="Search analysis..."
-          className="pl-8 pr-3 py-1.5 text-sm bg-gray-100 rounded-lg border-0 outline-none focus:ring-2 focus:ring-indigo-300 w-44 placeholder:text-gray-400"
+          className="pl-8 pr-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500 rounded-lg border-0 outline-none focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 w-44 placeholder:text-gray-400"
         />
       </div>
 
       {/* Upload button */}
       <button
         onClick={onUploadClick}
-        className="flex items-center gap-1.5 bg-gray-900 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg hover:bg-gray-700 transition-colors"
+        className="flex items-center gap-1.5 bg-gray-900 dark:bg-gray-700 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
       >
         <Upload size={13} />
         Upload
@@ -60,7 +60,7 @@ export default function TopNav({ activeTab, setActiveTab, onUploadClick }) {
       <div className="flex items-center gap-2">
         <button
           onClick={() => toast('Pro Feature: Coming in v2.0!', { icon: '🔒' })}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
           <Bell size={16} />
         </button>

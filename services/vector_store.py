@@ -13,30 +13,33 @@ _FAISS_FILE = "index.faiss"
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 
+def _sync_create_or_merge_index(chunks: List[Document]) -> None:
+    """Run entirely in one thread: load existing index (if any), add new chunks,
+    and persist.  Keeping all FAISS operations in a single thread avoids
+    cross-thread mutation hazards with the native FAISS C++ objects.
+    """
+    Path(VECTOR_STORE_PATH).mkdir(parents=True, exist_ok=True)
+    existing = load_index()
+    if existing is not None:
+        existing.add_documents(chunks)
+        existing.save_local(VECTOR_STORE_PATH)
+    else:
+        vector_store = FAISS.from_documents(chunks, embeddings)
+        vector_store.save_local(VECTOR_STORE_PATH)
+
+
 async def create_index(chunks: List[Document]) -> None:
     """Embed *chunks* and persist the FAISS index to disk.
 
     If an index already exists the new chunks are merged into it so that
     documents uploaded in separate requests are all searchable together.
-    FAISS operations are CPU-bound, so they run in a thread pool to avoid
-    blocking the event loop.
+    The entire load-add-save sequence runs inside a single thread to prevent
+    cross-thread mutation issues with the native FAISS C++ objects.
     """
     if not chunks:
         raise ValueError("Cannot create a vector index from an empty chunk list.")
 
-    Path(VECTOR_STORE_PATH).mkdir(parents=True, exist_ok=True)
-
-    existing = load_index()
-
-    if existing is not None:
-        # Merge new chunks into the existing index.
-        await asyncio.to_thread(existing.add_documents, chunks)
-        await asyncio.to_thread(existing.save_local, VECTOR_STORE_PATH)
-    else:
-        vector_store = await asyncio.to_thread(
-            FAISS.from_documents, chunks, embeddings
-        )
-        await asyncio.to_thread(vector_store.save_local, VECTOR_STORE_PATH)
+    await asyncio.to_thread(_sync_create_or_merge_index, chunks)
 
 
 def load_index() -> Optional[FAISS]:

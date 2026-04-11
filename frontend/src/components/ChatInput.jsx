@@ -33,13 +33,13 @@ export default function ChatInput({ onSend, onAttach, disabled }) {
   }
 
   return (
-    <div className="border-t border-gray-200 bg-white px-4 py-3">
-      <div className="flex items-end gap-2 bg-gray-100 rounded-2xl px-4 py-2.5">
+    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+      <div className="flex items-end gap-2 bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-2.5">
         {/* Paperclip */}
         <button
           onClick={onAttach}
           disabled={disabled}
-          className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0 mb-0.5 disabled:opacity-40"
+          className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0 mb-0.5 disabled:opacity-40"
           title="Attach file"
         >
           <Paperclip size={18} />
@@ -54,14 +54,14 @@ export default function ChatInput({ onSend, onAttach, disabled }) {
           onKeyDown={handleKeyDown}
           disabled={disabled}
           placeholder="Ask a question about your documents..."
-          className="flex-1 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 outline-none resize-none leading-relaxed max-h-40 disabled:opacity-60"
+          className="flex-1 bg-transparent text-sm text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none resize-none leading-relaxed max-h-40 disabled:opacity-60"
         />
 
         {/* Send */}
         <button
           onClick={submit}
           disabled={disabled || !value.trim()}
-          className="w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center text-white flex-shrink-0 hover:bg-indigo-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
+          className="w-8 h-8 bg-gray-900 dark:bg-indigo-600 rounded-full flex items-center justify-center text-white flex-shrink-0 hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
         >
           {disabled ? (
             <Loader2 size={14} className="animate-spin" />
@@ -70,7 +70,7 @@ export default function ChatInput({ onSend, onAttach, disabled }) {
           )}
         </button>
       </div>
-      <p className="text-[10px] text-gray-400 text-center mt-2">
+      <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-2">
         AI-generated responses may contain inaccuracies. Cross-reference with sources provided.
       </p>
     </div>
