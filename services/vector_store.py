@@ -69,9 +69,15 @@ def _sync_upsert(chunks: List[Document], namespace: str) -> int:
     """
     index = _get_pinecone_index()
 
-    # Purge the namespace before writing so stale vectors are never returned.
-    print(f"[VS] Deleting all vectors in namespace '{namespace}' before upsert.")
-    index.delete(delete_all=True, namespace=namespace)
+    # Only delete if the namespace already exists — calling delete on a
+    # non-existent namespace raises a Pinecone 404 "Namespace not found".
+    stats = index.describe_index_stats()
+    existing_namespaces = getattr(stats, "namespaces", {}) or {}
+    if namespace in existing_namespaces:
+        print(f"[VS] Deleting all vectors in namespace '{namespace}' before upsert.")
+        index.delete(delete_all=True, namespace=namespace)
+    else:
+        print(f"[VS] Namespace '{namespace}' does not exist yet — skipping delete.")
 
     store = PineconeVectorStore(index=index, embedding=_embeddings, namespace=namespace)
     store.add_documents(chunks)
@@ -96,13 +102,19 @@ def _sync_search(query: str, namespace: str, top_k: int = 4) -> list[dict]:
 
         # Guard: check namespace exists and has vectors before searching.
         stats = index.describe_index_stats()
-        namespaces = stats.get("namespaces", {})
+        namespaces = getattr(stats, "namespaces", {}) or {}
 
         if namespace not in namespaces:
             print(f"[VS] Namespace '{namespace}' does not exist — returning []")
             return []
 
-        if namespaces[namespace].get("vector_count", 0) == 0:
+        ns_stats = namespaces[namespace]
+        # DescribeIndexStatsResponse namespace entries expose vector_count as an
+        # attribute in Pinecone SDK v3+; fall back to dict-style for older SDKs.
+        vector_count = getattr(ns_stats, "vector_count", 0)
+        if vector_count is None:
+            vector_count = 0
+        if vector_count == 0:
             print(f"[VS] Namespace '{namespace}' is empty — returning []")
             return []
 
