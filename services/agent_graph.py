@@ -98,6 +98,12 @@ async def document_agent_node(state: AgentState) -> dict:
             "answer": "Document search is unavailable. Please check your Pinecone configuration.",
         }
 
+    if not chunks:
+        return {
+            "answer": "No documents found for this session. Please upload a document first.",
+            "retrieved_docs": [],
+        }
+
     # generate_rag_response handles history read, LLM call, and history write
     answer = await generate_rag_response(
         query=query,

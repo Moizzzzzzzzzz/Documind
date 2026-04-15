@@ -89,7 +89,14 @@ def _sync_search(query: str, top_k: int, namespace: str) -> list[dict]:
     """Embed *query* and run similarity search against Pinecone namespace."""
     index = _get_pinecone_index()
     store = PineconeVectorStore(index=index, embedding=_embeddings, namespace=namespace)
-    results: List[Document] = store.similarity_search(query, k=top_k)
+    try:
+        results: List[Document] = store.similarity_search(query, k=top_k)
+    except Exception as exc:
+        exc_str = str(exc).lower()
+        if "404" in exc_str or "namespace not found" in exc_str:
+            print(f"[VS] Namespace '{namespace}' not found in Pinecone — returning empty results.")
+            return []
+        raise
 
     print(f"[VS] Query: {query!r} (namespace={namespace!r}) — retrieved {len(results)} chunks")
     for i, doc in enumerate(results, 1):
