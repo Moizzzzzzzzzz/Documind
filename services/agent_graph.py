@@ -43,25 +43,64 @@ class AgentState(TypedDict):
 # ---------------------------------------------------------------------------
 
 _SUPERVISOR_PROMPT = """\
-You are a routing assistant. Classify the user query into exactly one of two categories:
+You are a query router for DocuMind.
+Documents ARE uploaded for this session.
 
-  document_rag  — the query requires information from uploaded documents
-  general       — the query can be answered from general knowledge alone
+Route to 'document_rag' if:
+- The query asks about content, information, data from documents
+- The query asks to summarize, analyze, explain anything
+- ANY question that COULD be answered from a document
+- When in doubt → ALWAYS choose document_rag
 
-Rules:
-- If the query asks about specific documents, files, reports, data, or references
-  content that would only be found in uploaded material, respond with: document_rag
-- If the query is a general question (coding help, definitions, open-ended chat,
-  math, writing, etc.) that does not depend on uploaded documents, respond with: general
-- Reply with ONLY the category label — no explanation, no punctuation, no extra text.
+Route to 'general' ONLY if:
+- Pure math calculation (e.g. '2+2')
+- Greetings only (e.g. 'hello', 'how are you')
+- Explicit request NOT about documents
+
+Output ONLY one word: document_rag OR general
 
 Query: {query}
 Category:"""
 
+# Keywords that identify a DocuMind identity question — answered inline
+# without touching the LLM routing path.
+_IDENTITY_TRIGGERS = (
+    "are you a rag",
+    "are you rag",
+    "what are you",
+    "who are you",
+    "what is documind",
+    "are you an ai",
+    "are you a chatbot",
+    "are you a bot",
+    "are you a deep learning",
+    "are you a language model",
+    "are you a llm",
+)
+
+_IDENTITY_ANSWER = (
+    "I am DocuMind, a RAG-based document research assistant powered by "
+    "Pinecone vector search and large language models. My job is to answer "
+    "your questions using only the documents you upload — I do not rely on "
+    "general training knowledge."
+)
+
 
 async def supervisor_node(state: AgentState) -> dict:
-    """Classify the query and set the route."""
+    """Classify the query and set the route.
+
+    Identity questions (e.g. 'are you a RAG system?') are intercepted here
+    and answered directly — they never reach the general_agent_node.
+    """
     from langchain_core.messages import HumanMessage
+
+    query_lower = state["query"].strip().lower()
+
+    # Short-circuit: answer identity questions inline so the LLM never
+    # misidentifies itself as a 'deep learning model'.
+    if any(trigger in query_lower for trigger in _IDENTITY_TRIGGERS):
+        print(f"[SUPERVISOR] Identity question detected — answering inline.")
+        return {"route": "identity", "answer": _IDENTITY_ANSWER}
 
     prompt = _SUPERVISOR_PROMPT.format(query=state["query"])
     try:
@@ -161,6 +200,15 @@ def route_query(state: AgentState) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Identity node — passes the pre-built answer straight through to END
+# ---------------------------------------------------------------------------
+
+async def identity_node(state: AgentState) -> dict:
+    """Return the identity answer already set by supervisor_node."""
+    return {"retrieved_docs": [], "answer": state.get("answer", _IDENTITY_ANSWER)}
+
+
+# ---------------------------------------------------------------------------
 # Build the graph
 # ---------------------------------------------------------------------------
 
@@ -170,6 +218,7 @@ def _build_graph() -> StateGraph:
     graph.add_node("supervisor", supervisor_node)
     graph.add_node("document_agent", document_agent_node)
     graph.add_node("general_agent", general_agent_node)
+    graph.add_node("identity_agent", identity_node)
 
     graph.add_edge(START, "supervisor")
     graph.add_conditional_edges(
@@ -178,10 +227,12 @@ def _build_graph() -> StateGraph:
         {
             "document_rag": "document_agent",
             "general": "general_agent",
+            "identity": "identity_agent",
         },
     )
     graph.add_edge("document_agent", END)
     graph.add_edge("general_agent", END)
+    graph.add_edge("identity_agent", END)
 
     return graph.compile()
 

@@ -15,7 +15,11 @@ async def search(
     _: None = Depends(rate_limiter),
 ) -> JSONResponse:
     try:
-        chunks = await search_documents(payload.query, payload.top_k)
+        chunks = await search_documents(
+            payload.query,
+            namespace=payload.session_id,
+            top_k=payload.top_k,
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

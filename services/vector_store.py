@@ -64,20 +64,34 @@ def _get_pinecone_index():
 def _sync_upsert(chunks: List[Document], namespace: str) -> int:
     """Embed *chunks* and upsert into Pinecone under *namespace*.
 
-    All existing vectors in the namespace are deleted first so that
-    re-uploading a document never produces duplicate chunks.
+    Only the vectors belonging to the specific source file being uploaded are
+    deleted before the new chunks are inserted.  Vectors from other files
+    already in the same namespace (session) are preserved, so uploading a
+    second document in the same session never wipes the first.
     """
     index = _get_pinecone_index()
 
-    # Only delete if the namespace already exists — calling delete on a
-    # non-existent namespace raises a Pinecone 404 "Namespace not found".
+    # Determine the source filename from the first chunk's metadata so we can
+    # do a targeted delete instead of wiping the whole namespace.
+    source_file = chunks[0].metadata.get("source_file", "") if chunks else ""
+
     stats = index.describe_index_stats()
     existing_namespaces = getattr(stats, "namespaces", {}) or {}
-    if namespace in existing_namespaces:
-        print(f"[VS] Deleting all vectors in namespace '{namespace}' before upsert.")
-        index.delete(delete_all=True, namespace=namespace)
+
+    if namespace in existing_namespaces and source_file:
+        print(
+            f"[VS] Deleting existing vectors for file '{source_file}' "
+            f"in namespace '{namespace}' before upsert."
+        )
+        index.delete(
+            filter={"source_file": {"$eq": source_file}},
+            namespace=namespace,
+        )
     else:
-        print(f"[VS] Namespace '{namespace}' does not exist yet — skipping delete.")
+        print(
+            f"[VS] Namespace '{namespace}' does not exist yet or no source_file — "
+            "skipping targeted delete, appending chunks."
+        )
 
     store = PineconeVectorStore(index=index, embedding=_embeddings, namespace=namespace)
     store.add_documents(chunks)
