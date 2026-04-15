@@ -61,10 +61,19 @@ def _get_pinecone_index():
     return _pinecone_index
 
 
-def _sync_upsert(chunks: List[Document]) -> int:
-    """Embed *chunks* and upsert into Pinecone. Returns the upserted count."""
+def _sync_upsert(chunks: List[Document], namespace: str) -> int:
+    """Embed *chunks* and upsert into Pinecone under *namespace*.
+
+    All existing vectors in the namespace are deleted first so that
+    re-uploading a document never produces duplicate chunks.
+    """
     index = _get_pinecone_index()
-    store = PineconeVectorStore(index=index, embedding=_embeddings)
+
+    # Purge the namespace before writing so stale vectors are never returned.
+    print(f"[VS] Deleting all vectors in namespace '{namespace}' before upsert.")
+    index.delete(delete_all=True, namespace=namespace)
+
+    store = PineconeVectorStore(index=index, embedding=_embeddings, namespace=namespace)
     store.add_documents(chunks)
 
     # Sanity-check: print live index stats after every upsert.
@@ -72,17 +81,17 @@ def _sync_upsert(chunks: List[Document]) -> int:
     # access total_vector_count as an attribute, not a dict key.
     stats = index.describe_index_stats()
     total = getattr(stats, "total_vector_count", "?")
-    print(f"[VS] Upserted {len(chunks)} chunks. Pinecone total vectors: {total}")
+    print(f"[VS] Upserted {len(chunks)} chunks into namespace '{namespace}'. Pinecone total vectors: {total}")
     return len(chunks)
 
 
-def _sync_search(query: str, top_k: int) -> list[dict]:
-    """Embed *query* and run similarity search against Pinecone."""
+def _sync_search(query: str, top_k: int, namespace: str) -> list[dict]:
+    """Embed *query* and run similarity search against Pinecone namespace."""
     index = _get_pinecone_index()
-    store = PineconeVectorStore(index=index, embedding=_embeddings)
+    store = PineconeVectorStore(index=index, embedding=_embeddings, namespace=namespace)
     results: List[Document] = store.similarity_search(query, k=top_k)
 
-    print(f"[VS] Query: {query!r} — retrieved {len(results)} chunks")
+    print(f"[VS] Query: {query!r} (namespace={namespace!r}) — retrieved {len(results)} chunks")
     for i, doc in enumerate(results, 1):
         meta = doc.metadata
         print(
@@ -100,22 +109,41 @@ def _sync_search(query: str, top_k: int) -> list[dict]:
 # so no callers (api/ingest.py, api/retrieval.py) need to change.
 # ---------------------------------------------------------------------------
 
-async def create_index(chunks: List[Document]) -> None:
-    """Embed *chunks* and upsert them into the Pinecone serverless index.
+async def create_index(chunks: List[Document], namespace: str) -> None:
+    """Embed *chunks* and upsert them into a session-scoped Pinecone namespace.
 
-    The index is created automatically on first call if it does not yet exist.
-    Existing vectors are never overwritten — Pinecone upserts by vector ID.
+    The shared index is created automatically on first call.  All existing
+    vectors in *namespace* are deleted before the new chunks are upserted,
+    so re-uploading a document never produces duplicate results.
+
+    Parameters
+    ----------
+    chunks:
+        Non-empty list of ``Document`` objects produced by the ingestion pipeline.
+    namespace:
+        Pinecone namespace that isolates this session's vectors.  Pass the
+        session_id from the API layer so each conversation is fully isolated.
     """
     if not chunks:
         raise ValueError("Cannot index an empty chunk list.")
-    await asyncio.to_thread(_sync_upsert, chunks)
+    await asyncio.to_thread(_sync_upsert, chunks, namespace)
 
 
-async def search_documents(query: str, top_k: int = 4) -> list[dict]:
-    """Return the top-k chunks most similar to *query*.
+async def search_documents(query: str, namespace: str, top_k: int = 4) -> list[dict]:
+    """Return the top-k chunks most similar to *query* within *namespace*.
+
+    Parameters
+    ----------
+    query:
+        User question / search string.
+    namespace:
+        Pinecone namespace to search — must be the same session_id used
+        during ``create_index`` so results are scoped to this session only.
+    top_k:
+        Maximum number of chunks to return.
 
     Raises ``ValueError`` if PINECONE_API_KEY is not set.
     """
     if not os.getenv("PINECONE_API_KEY"):
         raise ValueError("PINECONE_API_KEY is not configured.")
-    return await asyncio.to_thread(_sync_search, query, top_k)
+    return await asyncio.to_thread(_sync_search, query, top_k, namespace)

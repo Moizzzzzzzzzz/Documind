@@ -2,11 +2,12 @@ const BASE_URL = ''
 
 /**
  * Upload a file to POST /api/upload
- * Returns { filename, s3_key, chunk_count, message }
+ * Returns { filename, s3_key, chunk_count, session_id, message }
  */
-export async function uploadFile(file) {
+export async function uploadFile(file, sessionId) {
   const formData = new FormData()
   formData.append('file', file)
+  formData.append('session_id', sessionId)
 
   const res = await fetch(`${BASE_URL}/api/upload`, {
     method: 'POST',

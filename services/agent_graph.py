@@ -90,7 +90,7 @@ async def document_agent_node(state: AgentState) -> dict:
     session_id = state["session_id"]
 
     try:
-        chunks = await search_documents(query, top_k=4)
+        chunks = await search_documents(query, namespace=session_id, top_k=4)
     except ValueError as exc:
         logger.error("[DOC_AGENT] search_documents failed: %s", exc)
         return {

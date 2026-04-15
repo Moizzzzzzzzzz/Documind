@@ -46,7 +46,7 @@ export default function App() {
   const handleUpload = useCallback(async (file) => {
     setUploading(true)
     try {
-      const data = await uploadFile(file)
+      const data = await uploadFile(file, sessionId)
       const newDoc = {
         id: uuidv4(),
         filename: data.filename,

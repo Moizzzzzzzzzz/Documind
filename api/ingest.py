@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 
 import boto3
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 from core.security import rate_limiter
@@ -39,6 +39,7 @@ async def _upload_to_s3(content: bytes, s3_key: str) -> None:
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
+    session_id: str = Form(...),
     _: None = Depends(rate_limiter),
 ) -> JSONResponse:
     if not file.filename:
@@ -72,8 +73,10 @@ async def upload_document(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"S3 upload failed: {e}")
 
+    # Upsert into the session-scoped namespace so vectors from other sessions
+    # never contaminate this conversation's search results.
     try:
-        await create_index(chunks)
+        await create_index(chunks, namespace=session_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Vector index error: {e}")
 
@@ -82,6 +85,7 @@ async def upload_document(
         "s3_key": s3_key,
         "chunk_count": len(chunks),
         "page_count": page_count,
+        "session_id": session_id,
         "message": (
             f"Successfully ingested '{file.filename}' into {len(chunks)} chunks "
             "and updated the vector index."
