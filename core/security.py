@@ -5,7 +5,7 @@ import uuid
 import redis
 from fastapi import HTTPException, Request
 
-RATE_LIMIT: int = 10       # max requests per window
+RATE_LIMIT: int = 100      # max requests per window
 WINDOW_SECONDS: int = 3600  # rolling 1-hour window
 
 _client: redis.Redis | None = None
@@ -21,7 +21,7 @@ def _get_client() -> redis.Redis:
 
 
 def rate_limiter(request: Request) -> None:
-    """FastAPI dependency: 10 requests/hour per client IP, Redis-backed.
+    """FastAPI dependency: 100 requests/hour per client IP, Redis-backed.
 
     Algorithm — sorted-set sliding window:
       1. ZREMRANGEBYSCORE  — evict timestamps older than (now - 3600 s)
