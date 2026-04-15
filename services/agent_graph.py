@@ -20,7 +20,7 @@ from langgraph.graph import END, START, StateGraph
 
 from services.llm_chain import generate_rag_response, robust_llm
 from services.memory import get_chat_history, save_chat_history
-from services.vector_store import has_documents, search_documents
+from services.vector_store import search_documents
 
 logger = logging.getLogger(__name__)
 
@@ -62,15 +62,6 @@ Category:"""
 async def supervisor_node(state: AgentState) -> dict:
     """Classify the query and set the route."""
     from langchain_core.messages import HumanMessage
-
-    session_id = state["session_id"]
-
-    # Short-circuit: if no documents have been uploaded for this session,
-    # skip the LLM classifier and go straight to the general agent.
-    docs_exist = await has_documents(session_id)
-    if not docs_exist:
-        print(f"[SUPERVISOR] No documents in namespace '{session_id}' — routing to general.")
-        return {"route": "general"}
 
     prompt = _SUPERVISOR_PROMPT.format(query=state["query"])
     try:
