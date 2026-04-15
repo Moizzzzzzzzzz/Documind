@@ -89,6 +89,7 @@ async def document_agent_node(state: AgentState) -> dict:
     query = state["query"]
     session_id = state["session_id"]
 
+    print(f"[AGENT] Checking namespace: {session_id}")
     try:
         chunks = await search_documents(query, namespace=session_id, top_k=4)
     except ValueError as exc:

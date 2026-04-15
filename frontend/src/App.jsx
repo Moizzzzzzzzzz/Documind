@@ -16,6 +16,9 @@ export default function App() {
   // ── Session ────────────────────────────────────────────────────────────────
   // sessionId lives in state so New Conversation can mint a fresh UUID
   const [sessionId, setSessionId] = useState(() => uuidv4())
+  // Ref so handleUpload / handleSend always read the current value even when
+  // captured in a stale closure (empty-dep useCallback).
+  const sessionIdRef = useRef(sessionId)
 
   // ── Documents ─────────────────────────────────────────────────────────────
   const [documents, setDocuments] = useState([])          // all uploaded docs
@@ -37,6 +40,9 @@ export default function App() {
   const chatEndRef = useRef(null)
   const fileInputRef = useRef(null)   // single shared ref for the file picker
 
+  // Keep ref in sync with state so callbacks with stale closures still work
+  useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
+
   // ── Auto-scroll ───────────────────────────────────────────────────────────
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -46,7 +52,8 @@ export default function App() {
   const handleUpload = useCallback(async (file) => {
     setUploading(true)
     try {
-      const data = await uploadFile(file, sessionId)
+      console.log('UPLOAD sessionId:', sessionIdRef.current)
+      const data = await uploadFile(file, sessionIdRef.current)
       const newDoc = {
         id: uuidv4(),
         filename: data.filename,
@@ -90,7 +97,8 @@ export default function App() {
     setIsLoading(true)
 
     try {
-      const data = await sendChat(query, sessionId)
+      console.log('CHAT sessionId:', sessionIdRef.current)
+      const data = await sendChat(query, sessionIdRef.current)
       const aiMsg = {
         id: uuidv4(),
         role: 'assistant',
@@ -117,7 +125,7 @@ export default function App() {
     } finally {
       setIsLoading(false)
     }
-  }, [sessionId, activeDocument])
+  }, [activeDocument])
 
   // Suggestion pills fire directly as chat messages
   const handleSuggestion = useCallback((text) => {
@@ -140,7 +148,9 @@ export default function App() {
 
     // Reset chat state
     setMessages([])
-    setSessionId(uuidv4())           // new UUID = new backend conversation thread
+    const newId = uuidv4()
+    setSessionId(newId)              // new UUID = new backend conversation thread
+    sessionIdRef.current = newId     // immediate sync — state update is async
     setAnalysisPanelOpen(false)
     setActiveDocument(null)
   }, [messages, sessionId])
