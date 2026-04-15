@@ -1,18 +1,28 @@
-import { useRef, useState } from 'react'
-import { Paperclip, Send, Loader2 } from 'lucide-react'
+import { useRef, useState, useEffect } from 'react'
+import { ArrowUp, Mic, Loader2 } from 'lucide-react'
 
-export default function ChatInput({ onSend, onAttach, disabled }) {
+export default function ChatInput({ onSend, disabled, hasMessages }) {
   const [value, setValue] = useState('')
   const textareaRef = useRef(null)
+
+  // Auto-grow textarea as user types
+  const resize = () => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+  }
+
+  // Reset height when value is cleared (e.g. after send)
+  useEffect(() => {
+    if (value === '') resize()
+  }, [value])
 
   const submit = () => {
     const trimmed = value.trim()
     if (!trimmed || disabled) return
     onSend(trimmed)
     setValue('')
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-    }
   }
 
   const handleKeyDown = (e) => {
@@ -20,32 +30,44 @@ export default function ChatInput({ onSend, onAttach, disabled }) {
       e.preventDefault()
       submit()
     }
+    // Shift+Enter falls through — browser inserts a newline naturally
   }
 
   const handleChange = (e) => {
     setValue(e.target.value)
-    // Auto-grow textarea
-    const el = textareaRef.current
-    if (el) {
-      el.style.height = 'auto'
-      el.style.height = `${Math.min(el.scrollHeight, 160)}px`
-    }
+    resize()
   }
 
-  return (
-    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
-      <div className="flex items-end gap-2 bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-2.5">
-        {/* Paperclip */}
-        <button
-          onClick={onAttach}
-          disabled={disabled}
-          className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0 mb-0.5 disabled:opacity-40"
-          title="Attach file"
-        >
-          <Paperclip size={18} />
-        </button>
+  const canSend = value.trim().length > 0 && !disabled
+  const placeholder = hasMessages
+    ? 'Ask follow-up or research deeper…'
+    : 'Message DocuMind AI…'
 
-        {/* Textarea */}
+  return (
+    <div
+      style={{
+        padding: '12px 24px 18px',
+        backgroundColor: '#0D0D0F',
+        borderTop: '1px solid #2A2A30',
+        flexShrink: 0,
+      }}
+    >
+      {/* Input container */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: '10px',
+          backgroundColor: '#1A1A1F',
+          border: '1px solid #2A2A30',
+          borderRadius: '10px',
+          padding: '10px 14px',
+          transition: 'border-color 0.15s',
+        }}
+        onFocusCapture={(e) => { e.currentTarget.style.borderColor = '#4F46E5' }}
+        onBlurCapture={(e) => { e.currentTarget.style.borderColor = '#2A2A30' }}
+      >
+        {/* Auto-growing textarea */}
         <textarea
           ref={textareaRef}
           rows={1}
@@ -53,25 +75,69 @@ export default function ChatInput({ onSend, onAttach, disabled }) {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          placeholder="Ask a question about your documents..."
-          className="flex-1 bg-transparent text-sm text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none resize-none leading-relaxed max-h-40 disabled:opacity-60"
+          placeholder={placeholder}
+          style={{
+            flex: 1,
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            resize: 'none',
+            color: '#F4F4F5',
+            fontSize: '14px',
+            lineHeight: '1.55',
+            maxHeight: '160px',
+            fontFamily: 'inherit',
+            opacity: disabled ? 0.5 : 1,
+          }}
         />
 
-        {/* Send */}
-        <button
-          onClick={submit}
-          disabled={disabled || !value.trim()}
-          className="w-8 h-8 bg-gray-900 dark:bg-indigo-600 rounded-full flex items-center justify-center text-white flex-shrink-0 hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
-        >
-          {disabled ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <Send size={14} />
-          )}
-        </button>
+        {/* Right-side actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, paddingBottom: '1px' }}>
+          {/* Mic (placeholder — no recording functionality) */}
+          <button
+            type="button"
+            disabled={disabled}
+            style={{
+              width: '28px', height: '28px',
+              borderRadius: '6px', border: 'none',
+              background: 'transparent',
+              color: '#71717A',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'default',
+              opacity: 0.6,
+            }}
+          >
+            <Mic size={15} />
+          </button>
+
+          {/* Send — only styled active when text is present */}
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!canSend}
+            style={{
+              width: '30px', height: '30px',
+              borderRadius: '7px', border: 'none',
+              backgroundColor: canSend ? '#4F46E5' : '#1A1A1F',
+              color: canSend ? '#ffffff' : '#71717A',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: canSend ? 'pointer' : 'not-allowed',
+              flexShrink: 0,
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => { if (canSend) e.currentTarget.style.background = '#4338CA' }}
+            onMouseLeave={(e) => { if (canSend) e.currentTarget.style.background = '#4F46E5' }}
+          >
+            {disabled ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} />}
+          </button>
+        </div>
       </div>
-      <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-2">
-        AI-generated responses may contain inaccuracies. Cross-reference with sources provided.
+
+      <p style={{
+        color: '#71717A', fontSize: '10px', textAlign: 'center',
+        marginTop: '8px', letterSpacing: '0.01em',
+      }}>
+        Precision intelligence for enterprise document analysis
       </p>
     </div>
   )

@@ -1,31 +1,82 @@
-import { Brain, Upload, MessageSquare } from 'lucide-react'
+const SUGGESTIONS = [
+  'Summarize the key findings',
+  'Check for legal risks',
+  'Analyze quarterly trends',
+]
 
-export default function EmptyState({ onUploadClick }) {
+export default function EmptyState({ onSuggestion }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center px-8">
-      <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center">
-        <Brain size={32} className="text-indigo-500 dark:text-indigo-400" />
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '28px',
+        padding: '40px 24px',
+      }}
+    >
+      {/* Large D logo */}
+      <div
+        style={{
+          width: '72px',
+          height: '72px',
+          backgroundColor: '#1A1A1F',
+          border: '1px solid #2A2A30',
+          borderRadius: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <span style={{ color: '#F4F4F5', fontSize: '32px', fontWeight: '700', letterSpacing: '-1px' }}>D</span>
       </div>
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-          Start your research
-        </h2>
-        <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs leading-relaxed">
-          Upload documents from the sidebar, then ask questions to get AI-powered insights with source citations.
-        </p>
-      </div>
-      <div className="flex gap-4">
-        <button
-          onClick={onUploadClick}
-          className="flex items-center gap-2 bg-gray-900 dark:bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-colors"
-        >
-          <Upload size={14} />
-          Upload a document
-        </button>
-        <button className="flex items-center gap-2 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-          <MessageSquare size={14} />
-          Ask a question
-        </button>
+
+      {/* Heading */}
+      <h2
+        style={{
+          color: '#F4F4F5',
+          fontSize: '22px',
+          fontWeight: '600',
+          textAlign: 'center',
+          letterSpacing: '-0.01em',
+          lineHeight: '1.3',
+        }}
+      >
+        Ask anything about your documents
+      </h2>
+
+      {/* Suggestion pills */}
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {SUGGESTIONS.map((text) => (
+          <button
+            key={text}
+            onClick={() => onSuggestion?.(text)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: '1px solid #2A2A30',
+              background: 'transparent',
+              color: '#F4F4F5',
+              fontSize: '13px',
+              fontWeight: '400',
+              cursor: 'pointer',
+              transition: 'background 0.15s, border-color 0.15s',
+              whiteSpace: 'nowrap',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#1A1A1F'
+              e.currentTarget.style.borderColor = '#3A3A42'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.borderColor = '#2A2A30'
+            }}
+          >
+            {text}
+          </button>
+        ))}
       </div>
     </div>
   )

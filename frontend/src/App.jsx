@@ -1,78 +1,110 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
+
 import Sidebar from './components/Sidebar'
-import TopNav from './components/TopNav'
+import TopBar from './components/TopBar'
 import ChatMessage from './components/ChatMessage'
 import ChatInput from './components/ChatInput'
 import EmptyState from './components/EmptyState'
-import toast from 'react-hot-toast'
-import { uploadFile, sendChat } from './api'
-
-// Stable session_id for the lifetime of the page
-const SESSION_ID = uuidv4()
+import AnalysisPanel from './components/AnalysisPanel'
+import SettingsModal from './components/SettingsModal'
+import { uploadFile, sendChat, formatFileSize } from './api'
 
 export default function App() {
-  const [documents, setDocuments] = useState([])
-  // Independent state per tab to prevent message bleed
-  const [ragMessages, setRagMessages] = useState([])
-  const [analysisMessages, setAnalysisMessages] = useState([])
-  const [isRagLoading, setIsRagLoading] = useState(false)
-  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('Documents')
+  // ── Session ────────────────────────────────────────────────────────────────
+  // sessionId lives in state so New Conversation can mint a fresh UUID
+  const [sessionId, setSessionId] = useState(() => uuidv4())
+
+  // ── Documents ─────────────────────────────────────────────────────────────
+  const [documents, setDocuments] = useState([])          // all uploaded docs
+  const [activeDocument, setActiveDocument] = useState(null) // shown in panel
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  const [messages, setMessages] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
+
+  // ── Sessions (recent history, client-side) ────────────────────────────────
   const [sessions, setSessions] = useState([])
+
+  // ── UI state ──────────────────────────────────────────────────────────────
+  const [activeView, setActiveView] = useState('recent')       // sidebar tab
+  const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
   const chatEndRef = useRef(null)
-  const sidebarFileInputRef = useRef(null)
+  const fileInputRef = useRef(null)   // single shared ref for the file picker
 
-  // Derive the active state slices from the current tab
-  const isDocumentsTab = activeTab === 'Documents'
-  const messages = isDocumentsTab ? ragMessages : analysisMessages
-  const isChatLoading = isDocumentsTab ? isRagLoading : isAnalysisLoading
-  const setMessages = isDocumentsTab ? setRagMessages : setAnalysisMessages
-  const setIsChatLoading = isDocumentsTab ? setIsRagLoading : setIsAnalysisLoading
-
-  // Auto-scroll chat to bottom on new messages
+  // ── Auto-scroll ───────────────────────────────────────────────────────────
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isChatLoading])
+  }, [messages, isLoading])
 
+  // ── Upload ────────────────────────────────────────────────────────────────
   const handleUpload = useCallback(async (file) => {
-    const data = await uploadFile(file)
-    setDocuments((prev) => {
-      // Deduplicate by filename
-      const exists = prev.some((d) => d.filename === data.filename)
-      if (exists) return prev
-      return [...prev, { filename: data.filename, chunkCount: data.chunk_count }]
-    })
+    setUploading(true)
+    try {
+      const data = await uploadFile(file)
+      const newDoc = {
+        id: uuidv4(),
+        filename: data.filename,
+        chunkCount: data.chunk_count,
+        // File.size is in bytes — convert client-side since API doesn't return it
+        size: formatFileSize(file.size),
+        // Page count is not available from this API; show a dash
+        pages: '—',
+      }
+      setDocuments((prev) => {
+        const exists = prev.some((d) => d.filename === data.filename)
+        if (exists) {
+          // Update chunk count for re-uploaded file
+          return prev.map((d) => d.filename === data.filename ? { ...d, chunkCount: data.chunk_count } : d)
+        }
+        return [...prev, newDoc]
+      })
+      setActiveDocument(newDoc)
+      setAnalysisPanelOpen(true)
+      toast.success(`"${data.filename}" indexed — ${data.chunk_count} segments`)
+    } catch (err) {
+      toast.error(err.message || 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
   }, [])
 
-  const handleSend = useCallback(async (query) => {
-    // Capture the correct setters for the tab that is active at call time
-    const isRag = activeTab === 'Documents'
-    const appendMsg = isRag ? setRagMessages : setAnalysisMessages
-    const setLoading = isRag ? setIsRagLoading : setIsAnalysisLoading
+  const handleFileInputChange = useCallback((e) => {
+    const files = Array.from(e.target.files || [])
+    files.forEach((f) => handleUpload(f))
+    e.target.value = ''
+  }, [handleUpload])
 
-    appendMsg((prev) => [
-      ...prev,
-      { id: uuidv4(), role: 'user', content: query, timestamp: new Date() },
-    ])
-    setLoading(true)
+  const openFilePicker = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  const handleSend = useCallback(async (query) => {
+    const userMsg = { id: uuidv4(), role: 'user', content: query, timestamp: new Date() }
+    setMessages((prev) => [...prev, userMsg])
+    setIsLoading(true)
 
     try {
-      const data = await sendChat(query, SESSION_ID)
-      appendMsg((prev) => [
-        ...prev,
-        {
-          id: uuidv4(),
-          role: 'assistant',
-          content: data.answer,
-          sources: data.sources ?? [],
-          timestamp: new Date(),
-        },
-      ])
+      const data = await sendChat(query, sessionId)
+      const aiMsg = {
+        id: uuidv4(),
+        role: 'assistant',
+        content: data.answer,
+        sources: data.sources ?? [],
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, aiMsg])
+      // Auto-open analysis panel after first AI response if a doc is available
+      if (activeDocument) setAnalysisPanelOpen(true)
     } catch (err) {
-      toast.error(err.message || 'Something went wrong. Please try again.')
-      appendMsg((prev) => [
+      toast.error(err.message || 'Something went wrong')
+      setMessages((prev) => [
         ...prev,
         {
           id: uuidv4(),
@@ -84,87 +116,191 @@ export default function App() {
         },
       ])
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
-  }, [activeTab])
+  }, [sessionId, activeDocument])
 
-  const handleNewChat = () => {
-    const currentMessages = isDocumentsTab ? ragMessages : analysisMessages
-    if (currentMessages.length > 0) {
-      const firstUserMsg = currentMessages.find((m) => m.role === 'user')
-      const title = firstUserMsg
-        ? firstUserMsg.content.slice(0, 40) + (firstUserMsg.content.length > 40 ? '…' : '')
-        : 'Chat'
+  // Suggestion pills fire directly as chat messages
+  const handleSuggestion = useCallback((text) => {
+    handleSend(text)
+  }, [handleSend])
+
+  // ── New Conversation ──────────────────────────────────────────────────────
+  const handleNewChat = useCallback(() => {
+    // Save current conversation to the Recent list if it has messages
+    if (messages.length > 0) {
+      const firstUser = messages.find((m) => m.role === 'user')
+      const title = firstUser
+        ? firstUser.content.slice(0, 48) + (firstUser.content.length > 48 ? '…' : '')
+        : 'Untitled conversation'
       setSessions((prev) => [
-        { id: uuidv4(), title, messages: currentMessages, tab: activeTab, timestamp: new Date() },
-        ...prev,
+        { id: uuidv4(), title, messages, sessionId, timestamp: new Date() },
+        ...prev.slice(0, 19),   // cap at 20 recent entries
       ])
     }
-    if (isDocumentsTab) {
-      setRagMessages([])
-    } else {
-      setAnalysisMessages([])
-    }
-  }
 
-  const handleSelectSession = (session) => {
+    // Reset chat state
+    setMessages([])
+    setSessionId(uuidv4())           // new UUID = new backend conversation thread
+    setAnalysisPanelOpen(false)
+    setActiveDocument(null)
+  }, [messages, sessionId])
+
+  // ── Select a past session from Recent ─────────────────────────────────────
+  const handleSelectSession = useCallback((session) => {
+    // Restore messages; keep using current session_id (read-only history)
+    setMessages(session.messages)
     setSessions((prev) => prev.filter((s) => s.id !== session.id))
-    setActiveTab(session.tab)
-    if (session.tab === 'Documents') {
-      setRagMessages(session.messages)
-    } else {
-      setAnalysisMessages(session.messages)
-    }
-  }
+  }, [])
 
-  const handleTopUploadClick = () => {
-    // Delegate to the sidebar's hidden file input via a custom event
-    sidebarFileInputRef.current?.click()
-  }
+  // ── Document click in sidebar ─────────────────────────────────────────────
+  const handleDocumentClick = useCallback((doc) => {
+    setActiveDocument(doc)
+    setAnalysisPanelOpen(true)
+  }, [])
+
+  // ── Ignore (remove) the active document ──────────────────────────────────
+  const handleIgnoreDocument = useCallback(() => {
+    if (!activeDocument) return
+    setDocuments((prev) => {
+      const remaining = prev.filter((d) => d.filename !== activeDocument.filename)
+      if (remaining.length > 0) {
+        setActiveDocument(remaining[remaining.length - 1])
+      } else {
+        setActiveDocument(null)
+        setAnalysisPanelOpen(false)
+      }
+      return remaining
+    })
+  }, [activeDocument])
+
+  // ── Chat title for TopBar breadcrumb ──────────────────────────────────────
+  const firstUserMsg = messages.find((m) => m.role === 'user')
+  const chatTitle = firstUserMsg
+    ? firstUserMsg.content.slice(0, 32) + (firstUserMsg.content.length > 32 ? '…' : '')
+    : 'New Chat'
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
-      <Toaster position="bottom-right" toastOptions={{ style: { fontSize: '13px' } }} />
-      <Sidebar
-        documents={documents}
-        onUpload={handleUpload}
-        onNewChat={handleNewChat}
-        onSelectSession={handleSelectSession}
-        sessions={sessions}
-        fileInputRef={sidebarFileInputRef}
+    <div
+      style={{
+        display: 'flex',
+        height: '100vh',
+        width: '100vw',
+        overflow: 'hidden',
+        backgroundColor: '#0D0D0F',
+      }}
+    >
+      {/* Hidden shared file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.docx,.txt"
+        multiple
+        className="hidden"
+        onChange={handleFileInputChange}
       />
 
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-900">
-        <TopNav
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onUploadClick={handleTopUploadClick}
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          duration: 3500,
+          style: {
+            background: '#1A1A1F',
+            color: '#F4F4F5',
+            border: '1px solid #2A2A30',
+            fontSize: '13px',
+            borderRadius: '8px',
+          },
+        }}
+      />
+
+      {/* ── Left Sidebar ─────────────────────────────────────────────────── */}
+      <Sidebar
+        documents={documents}
+        sessions={sessions}
+        activeView={activeView}
+        activeDocument={activeDocument}
+        onViewChange={setActiveView}
+        onUploadClick={openFilePicker}
+        onNewChat={handleNewChat}
+        onSelectSession={handleSelectSession}
+        onDocumentClick={handleDocumentClick}
+        onOpenSettings={() => setSettingsOpen(true)}
+        uploading={uploading}
+      />
+
+      {/* ── Main area ────────────────────────────────────────────────────── */}
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minWidth: 0,
+          backgroundColor: '#0D0D0F',
+        }}
+      >
+        <TopBar
+          chatTitle={chatTitle}
+          onUploadClick={openFilePicker}
+          uploading={uploading}
         />
 
         {/* Chat window */}
-        <div className="flex-1 overflow-y-auto scrollbar-chat px-6 py-6">
+        <div
+          className="scrollbar-dm"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: messages.length === 0 ? '0' : '32px 40px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           {messages.length === 0 ? (
-            <EmptyState onUploadClick={handleTopUploadClick} />
+            <EmptyState onSuggestion={handleSuggestion} />
           ) : (
-            <div className="max-w-3xl mx-auto space-y-6">
+            <div style={{ maxWidth: '720px', width: '100%', margin: '0 auto' }}>
               {messages.map((msg) => (
                 <ChatMessage key={msg.id} message={msg} />
               ))}
 
-              {/* Thinking indicator */}
-              {isChatLoading && (
-                <div className="flex items-start gap-3">
-                  <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-[10px] font-bold">AI</span>
+              {/* Analyzing indicator */}
+              {isLoading && (
+                <div style={{ marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                    <div
+                      style={{
+                        width: '22px', height: '22px', borderRadius: '4px',
+                        backgroundColor: '#1A1A1F', border: '1px solid #2A2A30',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <span style={{ color: '#F4F4F5', fontSize: '10px', fontWeight: '700' }}>D</span>
+                    </div>
+                    <p style={{ color: '#71717A', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: '600' }}>
+                      DocuMind
+                    </p>
                   </div>
-                  <div className="flex items-center gap-1 pt-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:-0.3s]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:-0.15s]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ color: '#71717A', fontSize: '13px', fontStyle: 'italic' }}>Analyzing</span>
+                    <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+                      {[0, 0.18, 0.36].map((delay, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            width: '4px', height: '4px',
+                            borderRadius: '50%',
+                            backgroundColor: '#71717A',
+                            display: 'block',
+                            animation: `dm-bounce 1.1s ease-in-out ${delay}s infinite`,
+                          }}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
+
               <div ref={chatEndRef} />
             </div>
           )}
@@ -172,10 +308,33 @@ export default function App() {
 
         <ChatInput
           onSend={handleSend}
-          onAttach={handleTopUploadClick}
-          disabled={isChatLoading}
+          disabled={isLoading}
+          hasMessages={messages.length > 0}
         />
       </div>
+
+      {/* ── Right Analysis Panel ─────────────────────────────────────────── */}
+      {analysisPanelOpen && activeDocument && (
+        <AnalysisPanel
+          document={activeDocument}
+          messages={messages}
+          onClose={() => setAnalysisPanelOpen(false)}
+          onIgnoreDocument={handleIgnoreDocument}
+        />
+      )}
+
+      {/* ── Settings Modal ────────────────────────────────────────────────── */}
+      {settingsOpen && (
+        <SettingsModal onClose={() => setSettingsOpen(false)} />
+      )}
+
+      {/* Keyframe animations */}
+      <style>{`
+        @keyframes dm-bounce {
+          0%, 100% { transform: translateY(0); opacity: 0.4; }
+          50% { transform: translateY(-5px); opacity: 1; }
+        }
+      `}</style>
     </div>
   )
 }

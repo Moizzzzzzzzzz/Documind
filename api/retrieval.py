@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 
 from core.schemas import SearchQuery
 from core.security import rate_limiter
-from services.llm_chain import generate_rag_response
+from services.agent_graph import run_agent
 from services.vector_store import search_documents
 
 router = APIRouter(prefix="/api", tags=["retrieval"])
@@ -28,14 +28,8 @@ async def chat(
     _: None = Depends(rate_limiter),
 ) -> JSONResponse:
     try:
-        chunks = await search_documents(payload.query, payload.top_k)
+        result = await run_agent(payload.query, payload.session_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    answer = await generate_rag_response(
-        query=payload.query,
-        retrieved_chunks=chunks,
-        session_id=payload.session_id,
-    )
-
-    return JSONResponse(content={"answer": answer, "sources": chunks})
+    return JSONResponse(content=result)

@@ -5,10 +5,13 @@ uvicorn[standard]==0.29.0
 # LLM orchestration
 langchain==0.2.1
 langchain-community==0.2.1
+langgraph
 
 # Embeddings & vector store
 sentence-transformers==3.0.0
-faiss-cpu==1.8.0
+pinecone-client
+langchain-pinecone
+langchain-huggingface
 
 # Document parsing
 PyPDF2==3.0.1
@@ -17,6 +20,12 @@ unstructured==0.14.4
 
 # Frontend
 streamlit==1.35.0
+
+# Cloud / object storage
+boto3
+
+# Session store
+redis
 
 # Utilities
 python-dotenv==1.0.1

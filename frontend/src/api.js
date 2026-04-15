@@ -2,7 +2,7 @@ const BASE_URL = ''
 
 /**
  * Upload a file to POST /api/upload
- * Returns { filename, chunk_count, message }
+ * Returns { filename, s3_key, chunk_count, message }
  */
 export async function uploadFile(file) {
   const formData = new FormData()
@@ -38,4 +38,28 @@ export async function sendChat(query, sessionId, topK = 4) {
   }
 
   return res.json()
+}
+
+/**
+ * GET /api/history?session_id={id}
+ * Backend may not expose this endpoint — callers should handle gracefully.
+ * Returns { history: Array<{human, ai}> } or throws.
+ */
+export async function getHistory(sessionId) {
+  const res = await fetch(`${BASE_URL}/api/history?session_id=${encodeURIComponent(sessionId)}`)
+
+  if (!res.ok) {
+    throw new Error(`History unavailable: ${res.status}`)
+  }
+
+  return res.json()
+}
+
+/**
+ * Format a file's byte size into a human-readable string (e.g. "2.4 MB")
+ */
+export function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }

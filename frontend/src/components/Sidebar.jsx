@@ -1,173 +1,384 @@
-import { useRef, useState } from 'react'
+import { Plus, Clock, FileText, Settings, HelpCircle, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import {
-  Brain,
-  Plus,
-  Upload,
-  FileText,
-  MessageSquare,
-  CheckCircle2,
-  Loader2,
-} from 'lucide-react'
-import ThemeToggle from './ThemeToggle'
 
-export default function Sidebar({ documents, onUpload, onNewChat, onSelectSession, sessions = [], fileInputRef: externalRef }) {
-  const internalRef = useRef(null)
-  const fileInputRef = externalRef ?? internalRef
-  const [dragOver, setDragOver] = useState(false)
-  const [uploading, setUploading] = useState(false)
-
-  const handleFiles = async (files) => {
-    if (!files || files.length === 0) return
-    setUploading(true)
-    try {
-      for (const file of files) {
-        await onUpload(file)
-      }
-      toast.success('File uploaded successfully')
-    } catch (err) {
-      toast.error(err.message || 'Upload failed. Please try again.')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleDrop = (e) => {
-    e.preventDefault()
-    setDragOver(false)
-    handleFiles(e.dataTransfer.files)
-  }
-
-  const handleDragOver = (e) => {
-    e.preventDefault()
-    setDragOver(true)
-  }
-
-  const handleDragLeave = () => setDragOver(false)
-
-  const handleInputChange = (e) => {
-    handleFiles(e.target.files)
-    e.target.value = ''
-  }
-
+export default function Sidebar({
+  documents,
+  sessions,
+  activeView,
+  activeDocument,
+  onViewChange,
+  onUploadClick,
+  onNewChat,
+  onSelectSession,
+  onDocumentClick,
+  onOpenSettings,
+  uploading,
+}) {
   return (
-    <aside className="w-64 min-w-64 h-full bg-gray-950 flex flex-col border-r border-gray-800">
-      {/* Logo */}
-      <div className="px-4 pt-5 pb-4 border-b border-gray-800">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
-            <Brain size={16} className="text-white" />
+    <aside
+      style={{
+        width: '260px',
+        minWidth: '260px',
+        backgroundColor: '#111113',
+        borderRight: '1px solid #2A2A30',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* ── Logo ──────────────────────────────────────────────────────── */}
+      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #2A2A30', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            style={{
+              width: '36px', height: '36px',
+              backgroundColor: '#1A1A1F',
+              border: '1px solid #2A2A30',
+              borderRadius: '7px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ color: '#F4F4F5', fontSize: '16px', fontWeight: '700', letterSpacing: '-0.5px' }}>D</span>
           </div>
           <div>
-            <p className="text-white text-sm font-semibold leading-tight tracking-wide">
+            <p style={{ color: '#F4F4F5', fontSize: '14px', fontWeight: '600', lineHeight: '1.2', letterSpacing: '0.01em' }}>
               DocuMind AI
             </p>
-            <p className="text-gray-500 text-[10px] uppercase tracking-widest leading-tight">
-              Elite Digital Curator
+            <p style={{ color: '#71717A', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.12em', lineHeight: '1.5' }}>
+              Precision Intelligence
             </p>
           </div>
         </div>
       </div>
 
-      {/* New Chat */}
-      <div className="px-3 pt-4 pb-3">
+      {/* ── New Conversation ──────────────────────────────────────────── */}
+      <div style={{ padding: '14px 12px 8px', flexShrink: 0 }}>
         <button
           onClick={onNewChat}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-gray-700 text-gray-200 text-sm font-medium hover:bg-gray-800 hover:border-gray-600 transition-colors"
+          style={{
+            width: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '9px 14px',
+            borderRadius: '8px',
+            border: '1px solid #2A2A30',
+            background: 'transparent',
+            color: '#F4F4F5',
+            fontSize: '13px', fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'background 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#1A1A1F'
+            e.currentTarget.style.borderColor = '#3A3A42'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.borderColor = '#2A2A30'
+          }}
         >
-          <Plus size={15} />
-          New Chat
+          <span>New Conversation</span>
+          <Plus size={14} style={{ color: '#71717A' }} />
         </button>
       </div>
 
-      {/* Upload Zone */}
-      <div className="px-3 pb-3">
-        <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onClick={() => !uploading && fileInputRef.current?.click()}
-          className={`
-            relative w-full rounded-xl border-2 border-dashed p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all
-            ${dragOver
-              ? 'border-indigo-500 bg-indigo-950/40'
-              : 'border-gray-700 hover:border-gray-600 hover:bg-gray-900/60'
-            }
-            ${uploading ? 'pointer-events-none opacity-70' : ''}
-          `}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.docx,.txt"
-            multiple
-            className="hidden"
-            onChange={handleInputChange}
-          />
-          {uploading ? (
-            <Loader2 size={22} className="text-indigo-400 animate-spin" />
-          ) : (
-            <Upload size={22} className="text-gray-500" />
-          )}
-          <p className="text-gray-300 text-xs font-medium text-center leading-snug">
-            {uploading ? 'Uploading…' : 'Upload Files'}
-          </p>
-          <p className="text-gray-600 text-[10px] text-center">
-            PDF, DOCX up to 50MB
-          </p>
-        </div>
-      </div>
+      {/* ── Library nav ───────────────────────────────────────────────── */}
+      <div style={{ padding: '8px 12px 4px', flexShrink: 0 }}>
+        <p style={{
+          color: '#71717A', fontSize: '9px', textTransform: 'uppercase',
+          letterSpacing: '0.12em', fontWeight: '600', padding: '0 4px 8px',
+        }}>
+          Library
+        </p>
 
-      {/* Uploaded Documents */}
-      {documents.length > 0 && (
-        <div className="px-3 pb-3 flex flex-col gap-1">
-          <p className="text-gray-600 text-[10px] uppercase tracking-widest px-1 mb-1">
-            Uploaded Documents
-          </p>
-          <div className="flex flex-col gap-1 max-h-40 overflow-y-auto scrollbar-thin">
-            {documents.map((doc) => (
-              <div
-                key={doc.filename}
-                className="flex items-center gap-2 bg-gray-900 rounded-lg px-2.5 py-2"
-              >
-                <FileText size={14} className="text-gray-500 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-gray-200 text-xs truncate leading-tight">
-                    {doc.filename}
-                  </p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <CheckCircle2 size={10} className="text-emerald-500" />
-                    <span className="text-emerald-500 text-[10px]">Ready</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Past Chats */}
-      <div className="px-3 pb-3 flex-1 flex flex-col gap-0.5 overflow-y-auto scrollbar-thin min-h-0">
-        {sessions.length > 0 && (
-          <p className="text-gray-600 text-[10px] uppercase tracking-widest px-1 mb-1 flex-shrink-0">
-            Past Chats
-          </p>
-        )}
-        {sessions.map((session) => (
+        {[
+          { id: 'recent', label: 'Recent', Icon: Clock },
+          { id: 'documents', label: 'Documents', Icon: FileText },
+        ].map(({ id, label, Icon }) => (
           <button
-            key={session.id}
-            onClick={() => onSelectSession(session)}
-            className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors text-left"
+            key={id}
+            onClick={() => onViewChange(id)}
+            style={{
+              width: '100%',
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '8px 10px',
+              borderRadius: '7px',
+              border: 'none',
+              background: activeView === id ? '#1A1A1F' : 'transparent',
+              color: activeView === id ? '#F4F4F5' : '#71717A',
+              fontSize: '13px', fontWeight: '500',
+              cursor: 'pointer', textAlign: 'left',
+              transition: 'background 0.15s, color 0.15s',
+              marginBottom: '2px',
+            }}
+            onMouseEnter={(e) => {
+              if (activeView !== id) {
+                e.currentTarget.style.background = '#1A1A1F'
+                e.currentTarget.style.color = '#F4F4F5'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeView !== id) {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = '#71717A'
+              }
+            }}
           >
-            <MessageSquare size={14} className="flex-shrink-0" />
-            <span className="truncate">{session.title}</span>
+            <Icon size={14} style={{ flexShrink: 0 }} />
+            <span>{label}</span>
+            {/* Badge: document count or session count */}
+            {id === 'documents' && documents.length > 0 && (
+              <span style={{
+                marginLeft: 'auto',
+                backgroundColor: '#1A1A1F',
+                border: '1px solid #2A2A30',
+                color: '#71717A',
+                fontSize: '9px',
+                fontWeight: '700',
+                padding: '1px 6px',
+                borderRadius: '10px',
+                letterSpacing: '0.04em',
+              }}>
+                {documents.length}
+              </span>
+            )}
+            {id === 'recent' && sessions.length > 0 && (
+              <span style={{
+                marginLeft: 'auto',
+                backgroundColor: '#1A1A1F',
+                border: '1px solid #2A2A30',
+                color: '#71717A',
+                fontSize: '9px',
+                fontWeight: '700',
+                padding: '1px 6px',
+                borderRadius: '10px',
+                letterSpacing: '0.04em',
+              }}>
+                {sessions.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Theme Toggle */}
-      <div className="px-3 pb-4 pt-2 border-t border-gray-800 flex-shrink-0">
-        <ThemeToggle />
+      {/* ── Dynamic list (Recent / Documents) ─────────────────────────── */}
+      <div
+        className="scrollbar-dm"
+        style={{ flex: 1, overflowY: 'auto', padding: '4px 12px', minHeight: 0 }}
+      >
+        {/* ── RECENT view ────────────────────────────────────── */}
+        {activeView === 'recent' && (
+          <>
+            {sessions.length === 0 ? (
+              <p style={{ color: '#71717A', fontSize: '11px', padding: '8px 4px', fontStyle: 'italic', lineHeight: '1.5' }}>
+                No recent conversations yet
+              </p>
+            ) : (
+              sessions.map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => onSelectSession(session)}
+                  title={session.title}
+                  style={{
+                    width: '100%',
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '7px 8px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#71717A',
+                    fontSize: '12px',
+                    cursor: 'pointer', textAlign: 'left',
+                    transition: 'background 0.15s, color 0.15s',
+                    marginBottom: '2px',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#1A1A1F'
+                    e.currentTarget.style.color = '#F4F4F5'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.color = '#71717A'
+                  }}
+                >
+                  <Clock size={11} style={{ flexShrink: 0, opacity: 0.7 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                    {session.title}
+                  </span>
+                </button>
+              ))
+            )}
+          </>
+        )}
+
+        {/* ── DOCUMENTS view ─────────────────────────────────── */}
+        {activeView === 'documents' && (
+          <>
+            {documents.length === 0 ? (
+              <p style={{ color: '#71717A', fontSize: '11px', padding: '8px 4px', fontStyle: 'italic', lineHeight: '1.5' }}>
+                No documents yet — upload a PDF, DOCX, or TXT
+              </p>
+            ) : (
+              documents.map((doc) => {
+                const isActive = activeDocument?.filename === doc.filename
+                return (
+                  <button
+                    key={doc.id ?? doc.filename}
+                    onClick={() => onDocumentClick(doc)}
+                    title={doc.filename}
+                    style={{
+                      width: '100%',
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '9px 10px',
+                      borderRadius: '7px',
+                      border: isActive ? '1px solid #3A3A50' : '1px solid transparent',
+                      background: isActive ? '#1A1A2F' : 'transparent',
+                      cursor: 'pointer', textAlign: 'left',
+                      transition: 'all 0.15s',
+                      marginBottom: '3px',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = '#1A1A1F'
+                        e.currentTarget.style.borderColor = '#2A2A30'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = 'transparent'
+                        e.currentTarget.style.borderColor = 'transparent'
+                      }
+                    }}
+                  >
+                    {/* File icon */}
+                    <FileText size={14} style={{ flexShrink: 0, color: isActive ? '#4F46E5' : '#71717A' }} />
+
+                    {/* File info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        color: '#F4F4F5', fontSize: '12px', fontWeight: '500',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        lineHeight: '1.3', marginBottom: '2px',
+                      }}>
+                        {doc.filename}
+                      </p>
+                      <p style={{ color: '#71717A', fontSize: '10px' }}>
+                        {doc.chunkCount} segments · {doc.size}
+                      </p>
+                    </div>
+
+                    {/* Green "indexed" dot */}
+                    <span
+                      title="Indexed successfully"
+                      style={{
+                        width: '7px', height: '7px',
+                        borderRadius: '50%',
+                        backgroundColor: '#22C55E',
+                        flexShrink: 0,
+                        boxShadow: '0 0 5px rgba(34, 197, 94, 0.5)',
+                      }}
+                    />
+                  </button>
+                )
+              })
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Bottom: Upload + Settings/Support ─────────────────────────── */}
+      <div style={{ padding: '10px 12px 14px', borderTop: '1px solid #2A2A30', flexShrink: 0 }}>
+        {/* Upload Document dashed button */}
+        <button
+          onClick={onUploadClick}
+          disabled={uploading}
+          style={{
+            width: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            padding: '7px',
+            marginBottom: '6px',
+            borderRadius: '7px',
+            border: '1px dashed #2A2A30',
+            background: 'transparent',
+            color: uploading ? '#4F46E5' : '#71717A',
+            fontSize: '11px',
+            cursor: uploading ? 'not-allowed' : 'pointer',
+            opacity: uploading ? 0.7 : 1,
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            if (!uploading) {
+              e.currentTarget.style.borderColor = '#4F46E5'
+              e.currentTarget.style.color = '#4F46E5'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!uploading) {
+              e.currentTarget.style.borderColor = '#2A2A30'
+              e.currentTarget.style.color = '#71717A'
+            }
+          }}
+        >
+          {uploading ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
+          <span>{uploading ? 'Uploading…' : 'Upload Document'}</span>
+        </button>
+
+        {/* Settings + Support */}
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button
+            onClick={onOpenSettings}
+            style={{
+              flex: 1,
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '7px 8px',
+              borderRadius: '7px',
+              border: 'none',
+              background: 'transparent',
+              color: '#71717A',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#1A1A1F'
+              e.currentTarget.style.color = '#F4F4F5'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = '#71717A'
+            }}
+          >
+            <Settings size={13} />
+            <span>Settings</span>
+          </button>
+
+          <button
+            onClick={() => toast('Support documentation coming soon', { icon: '📚' })}
+            style={{
+              flex: 1,
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '7px 8px',
+              borderRadius: '7px',
+              border: 'none',
+              background: 'transparent',
+              color: '#71717A',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#1A1A1F'
+              e.currentTarget.style.color = '#F4F4F5'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = '#71717A'
+            }}
+          >
+            <HelpCircle size={13} />
+            <span>Support</span>
+          </button>
+        </div>
       </div>
     </aside>
   )
