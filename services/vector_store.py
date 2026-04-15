@@ -61,40 +61,57 @@ def _get_pinecone_index():
     return _pinecone_index
 
 
+def _make_vector_ids(namespace: str, source_file: str, count: int) -> list[str]:
+    """Generate deterministic vector IDs for a file's chunks.
+
+    IDs are stable across re-uploads so deleting and re-inserting the same
+    file always targets the exact same vector slots in Pinecone.  Truncating
+    namespace/source_file keeps IDs short and avoids Pinecone ID-length limits.
+
+    Safe characters only: alphanumerics and underscores.
+    """
+    ns_prefix = namespace[:8].replace("-", "_")
+    sf_prefix = (
+        source_file[:20]
+        .replace(" ", "_")
+        .replace(".", "_")
+        .replace("/", "_")
+        .replace("\\", "_")
+    )
+    return [f"{ns_prefix}_{sf_prefix}_{i}" for i in range(count)]
+
+
 def _sync_upsert(chunks: List[Document], namespace: str) -> int:
     """Embed *chunks* and upsert into Pinecone under *namespace*.
 
-    Only the vectors belonging to the specific source file being uploaded are
-    deleted before the new chunks are inserted.  Vectors from other files
-    already in the same namespace (session) are preserved, so uploading a
-    second document in the same session never wipes the first.
+    Uses deterministic ID-based deletion (Starter-tier compatible) so that
+    re-uploading a file only removes that file's old vectors.  Vectors from
+    other files already in the same session namespace are preserved.
     """
-    index = _get_pinecone_index()
+    if not chunks:
+        return 0
 
-    # Determine the source filename from the first chunk's metadata so we can
-    # do a targeted delete instead of wiping the whole namespace.
-    source_file = chunks[0].metadata.get("source_file", "") if chunks else ""
+    index = _get_pinecone_index()
+    source_file = chunks[0].metadata.get("source_file", "unknown")
+
+    # Build the same deterministic IDs that were used (or will be used) for
+    # this file so we can delete the old vectors before inserting new ones.
+    ids = _make_vector_ids(namespace, source_file, len(chunks))
 
     stats = index.describe_index_stats()
     existing_namespaces = getattr(stats, "namespaces", {}) or {}
 
-    if namespace in existing_namespaces and source_file:
-        print(
-            f"[VS] Deleting existing vectors for file '{source_file}' "
-            f"in namespace '{namespace}' before upsert."
-        )
-        index.delete(
-            filter={"source_file": {"$eq": source_file}},
-            namespace=namespace,
-        )
+    if namespace in existing_namespaces:
+        try:
+            index.delete(ids=ids, namespace=namespace)
+            print(f"[VS] Deleted {len(ids)} old vectors for '{source_file}' in namespace '{namespace}'.")
+        except Exception as exc:
+            print(f"[VS] ID-based delete skipped (will append): {exc}")
     else:
-        print(
-            f"[VS] Namespace '{namespace}' does not exist yet or no source_file — "
-            "skipping targeted delete, appending chunks."
-        )
+        print(f"[VS] Namespace '{namespace}' does not exist yet — skipping delete, appending chunks.")
 
     store = PineconeVectorStore(index=index, embedding=_embeddings, namespace=namespace)
-    store.add_documents(chunks)
+    store.add_documents(chunks, ids=ids)
 
     # Sanity-check: print live index stats after every upsert.
     # describe_index_stats() returns a protobuf-style object in Pinecone v7;
