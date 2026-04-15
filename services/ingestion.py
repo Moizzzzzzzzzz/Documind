@@ -11,16 +11,18 @@ async def ingest_document(
     file_bytes: bytes,
     filename: str,
     s3_key: str,
-) -> List[Document]:
+) -> tuple[List[Document], int]:
     """Parse document from raw bytes and chunk it.
 
     No local file is written. The s3_key is embedded in every chunk's
     metadata so retrieval results can reference the canonical storage location.
+
+    Returns a tuple of (chunks, page_count).
     """
     file_like = io.BytesIO(file_bytes)
     pages = parse_document(file_like, filename, s3_key)
 
     if not pages:
-        return []
+        return [], 0
 
-    return chunk_documents(pages)
+    return chunk_documents(pages), len(pages)

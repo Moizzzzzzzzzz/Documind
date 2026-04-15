@@ -56,7 +56,7 @@ async def upload_document(
 
     # Parse first — if the document is unreadable, we don't pollute S3.
     try:
-        chunks = await ingest_document(content, file.filename, s3_key)
+        chunks, page_count = await ingest_document(content, file.filename, s3_key)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -81,6 +81,7 @@ async def upload_document(
         "filename": file.filename,
         "s3_key": s3_key,
         "chunk_count": len(chunks),
+        "page_count": page_count,
         "message": (
             f"Successfully ingested '{file.filename}' into {len(chunks)} chunks "
             "and updated the vector index."

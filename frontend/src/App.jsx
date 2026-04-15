@@ -53,14 +53,13 @@ export default function App() {
         chunkCount: data.chunk_count,
         // File.size is in bytes — convert client-side since API doesn't return it
         size: formatFileSize(file.size),
-        // Page count is not available from this API; show a dash
-        pages: '—',
+        pages: data.page_count ?? '—',
       }
       setDocuments((prev) => {
         const exists = prev.some((d) => d.filename === data.filename)
         if (exists) {
-          // Update chunk count for re-uploaded file
-          return prev.map((d) => d.filename === data.filename ? { ...d, chunkCount: data.chunk_count } : d)
+          // Update chunk count and page count for re-uploaded file
+          return prev.map((d) => d.filename === data.filename ? { ...d, chunkCount: data.chunk_count, pages: data.page_count ?? '—' } : d)
         }
         return [...prev, newDoc]
       })
