@@ -43,7 +43,8 @@ def _get_pinecone_index():
 
     _pc = Pinecone(api_key=api_key)
 
-    if not _pc.has_index(index_name):
+    existing = [i.name for i in _pc.list_indexes()]
+    if index_name not in existing:
         print(f"[VS] Pinecone index '{index_name}' not found — creating (dim={_DIMENSION}, metric={_METRIC}).")
         _pc.create_index(
             name=index_name,
