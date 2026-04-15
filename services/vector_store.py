@@ -88,13 +88,13 @@ def _sync_upsert(chunks: List[Document], namespace: str) -> int:
 def _sync_search(query: str, top_k: int, namespace: str) -> list[dict]:
     """Embed *query* and run similarity search against Pinecone namespace."""
     index = _get_pinecone_index()
-    store = PineconeVectorStore(index=index, embedding=_embeddings, namespace=namespace)
     try:
+        store = PineconeVectorStore(index=index, embedding=_embeddings, namespace=namespace)
         results: List[Document] = store.similarity_search(query, k=top_k)
-    except Exception as exc:
-        exc_str = str(exc).lower()
-        if "404" in exc_str or "namespace not found" in exc_str:
-            print(f"[VS] Namespace '{namespace}' not found in Pinecone — returning empty results.")
+    except Exception as e:
+        error_str = str(e)
+        if "404" in error_str or "Namespace not found" in error_str or "not found" in error_str.lower():
+            print(f"[VS] Namespace '{namespace}' not found — returning empty results")
             return []
         raise
 
@@ -109,6 +109,20 @@ def _sync_search(query: str, top_k: int, namespace: str) -> list[dict]:
         )
 
     return [{"content": doc.page_content, "metadata": doc.metadata} for doc in results]
+
+
+def _sync_has_documents(namespace: str) -> bool:
+    """Return True if *namespace* contains at least one vector in Pinecone."""
+    try:
+        index = _get_pinecone_index()
+        stats = index.describe_index_stats()
+        namespaces = getattr(stats, "namespaces", {}) or {}
+        ns_stats = namespaces.get(namespace)
+        count = getattr(ns_stats, "vector_count", 0) if ns_stats else 0
+        return count > 0
+    except Exception as exc:
+        print(f"[VS] has_documents check failed ({exc}) — assuming no documents.")
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -154,3 +168,12 @@ async def search_documents(query: str, namespace: str, top_k: int = 4) -> list[d
     if not os.getenv("PINECONE_API_KEY"):
         raise ValueError("PINECONE_API_KEY is not configured.")
     return await asyncio.to_thread(_sync_search, query, top_k, namespace)
+
+
+async def has_documents(namespace: str) -> bool:
+    """Return True if *namespace* has at least one indexed vector.
+
+    Used by the supervisor to skip RAG routing when no document has been
+    uploaded for the current session yet.
+    """
+    return await asyncio.to_thread(_sync_has_documents, namespace)
