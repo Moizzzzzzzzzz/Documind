@@ -122,7 +122,7 @@ def _sync_upsert(chunks: List[Document], namespace: str) -> int:
     return len(chunks)
 
 
-def _sync_search(query: str, namespace: str, top_k: int = 4) -> list[dict]:
+def _sync_search(query: str, namespace: str, top_k: int = 8) -> list[dict]:
     """Check namespace existence first, then run similarity search.
 
     Pre-checking via describe_index_stats() avoids the langchain-pinecone
@@ -199,7 +199,7 @@ async def create_index(chunks: List[Document], namespace: str) -> None:
     await asyncio.to_thread(_sync_upsert, chunks, namespace)
 
 
-async def search_documents(query: str, namespace: str, top_k: int = 4) -> list[dict]:
+async def search_documents(query: str, namespace: str, top_k: int = 8) -> list[dict]:
     """Return the top-k chunks most similar to *query* within *namespace*.
 
     Parameters
