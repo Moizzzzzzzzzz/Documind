@@ -7,7 +7,7 @@ from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 security = HTTPBearer()
-CLERK_ISSUER = os.getenv("CLERK_ISSUER")
+CLERK_ISSUER = os.getenv("CLERK_ISSUER", "https://cute-escargot-85.clerk.accounts.dev")
 
 
 @lru_cache(maxsize=1)
