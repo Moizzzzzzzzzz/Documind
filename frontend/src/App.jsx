@@ -20,22 +20,107 @@ export default function App() {
     <>
       <SignedOut>
         <div className="auth-screen">
-          <SignIn
-            routing="hash"
-            appearance={{
-              variables: {
-                colorBackground: '#0D0D0F',
-                colorText: '#ffffff',
-                colorPrimary: '#6366f1',
-                colorInputBackground: '#1a1a1f',
-                colorInputText: '#ffffff',
-              },
-              elements: {
-                card: { boxShadow: 'none', border: '1px solid rgba(255,255,255,0.08)' },
-                formButtonPrimary: { borderRadius: '6px' },
-              },
-            }}
-          />
+          {/* Left branding panel */}
+          <div className="auth-left">
+            <div className="auth-logo">
+              <div className="auth-logo-dot"></div>
+              DocuMind
+            </div>
+            <div className="auth-tagline">
+              Your documents.<br />
+              <span>Instant answers.</span>
+            </div>
+            <div className="auth-features">
+              <div className="auth-feature">
+                <div className="auth-feature-icon">⚡</div>
+                <div>
+                  <div style={{ color: '#f1f0ef', marginBottom: 2 }}>Real-time streaming</div>
+                  Word-by-word AI responses as they generate
+                </div>
+              </div>
+              <div className="auth-feature">
+                <div className="auth-feature-icon">📄</div>
+                <div>
+                  <div style={{ color: '#f1f0ef', marginBottom: 2 }}>Multi-document RAG</div>
+                  Search across all your documents with cited sources
+                </div>
+              </div>
+              <div className="auth-feature">
+                <div className="auth-feature-icon">🔒</div>
+                <div>
+                  <div style={{ color: '#f1f0ef', marginBottom: 2 }}>Session-isolated</div>
+                  Your data is private, namespaced, production-grade
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right sign-in panel */}
+          <div className="auth-right">
+            <SignIn
+              routing="hash"
+              appearance={{
+                variables: {
+                  colorBackground: '#111113',
+                  colorText: '#f1f0ef',
+                  colorTextSecondary: '#8b8a86',
+                  colorPrimary: '#6366f1',
+                  colorInputBackground: '#1c1c1f',
+                  colorInputText: '#f1f0ef',
+                  borderRadius: '8px',
+                  fontFamily: 'inherit',
+                },
+                elements: {
+                  card: {
+                    background: '#111113',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    boxShadow: '0 0 0 1px rgba(255,255,255,0.04)',
+                    borderRadius: '12px',
+                    padding: '32px',
+                  },
+                  headerTitle: {
+                    color: '#f1f0ef',
+                    fontSize: '20px',
+                    fontWeight: '600',
+                  },
+                  headerSubtitle: {
+                    color: '#8b8a86',
+                  },
+                  formButtonPrimary: {
+                    background: '#6366f1',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    '&:hover': { background: '#5558e8' },
+                  },
+                  formFieldInput: {
+                    background: '#1c1c1f',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px',
+                    color: '#f1f0ef',
+                    fontSize: '14px',
+                    '&:focus': { borderColor: '#6366f1' },
+                  },
+                  formFieldLabel: {
+                    color: '#8b8a86',
+                    fontSize: '13px',
+                  },
+                  dividerLine: { background: 'rgba(255,255,255,0.08)' },
+                  dividerText: { color: '#8b8a86' },
+                  socialButtonsBlockButton: {
+                    background: '#1c1c1f',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px',
+                    color: '#f1f0ef',
+                    '&:hover': { background: '#242428' },
+                  },
+                  footerActionLink: { color: '#6366f1' },
+                  identityPreviewText: { color: '#f1f0ef' },
+                  identityPreviewEditButton: { color: '#6366f1' },
+                },
+              }}
+            />
+          </div>
         </div>
       </SignedOut>
       <SignedIn>
@@ -45,9 +130,111 @@ export default function App() {
         .auth-screen {
           min-height: 100vh;
           background: #0D0D0F;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .auth-left {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          padding: 60px;
+          background: linear-gradient(135deg, #0D0D0F 0%, #12111a 100%);
+          border-right: 1px solid rgba(255,255,255,0.06);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .auth-left::before {
+          content: '';
+          position: absolute;
+          width: 400px;
+          height: 400px;
+          background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+          top: 20%;
+          left: 30%;
+          pointer-events: none;
+        }
+
+        .auth-logo {
+          font-size: 26px;
+          font-weight: 600;
+          color: #f1f0ef;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .auth-logo-dot {
+          width: 8px;
+          height: 8px;
+          background: #6366f1;
+          border-radius: 50%;
+        }
+
+        .auth-tagline {
+          font-size: 32px;
+          font-weight: 600;
+          color: #f1f0ef;
+          line-height: 1.3;
+          margin-bottom: 48px;
+          max-width: 400px;
+        }
+
+        .auth-tagline span {
+          color: #6366f1;
+        }
+
+        .auth-features {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .auth-feature {
+          display: flex;
+          align-items: flex-start;
+          gap: 14px;
+          color: #8b8a86;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+
+        .auth-feature-icon {
+          width: 32px;
+          height: 32px;
+          background: rgba(99,102,241,0.12);
+          border: 1px solid rgba(99,102,241,0.2);
+          border-radius: 8px;
           display: flex;
           align-items: center;
           justify-content: center;
+          flex-shrink: 0;
+          color: #6366f1;
+          font-size: 15px;
+        }
+
+        .auth-right {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 60px;
+          background: #0D0D0F;
+        }
+
+        @media (max-width: 768px) {
+          .auth-screen {
+            grid-template-columns: 1fr;
+          }
+          .auth-left {
+            display: none;
+          }
+          .auth-right {
+            padding: 40px 24px;
+            align-items: flex-start;
+            padding-top: 80px;
+          }
         }
       `}</style>
     </>
