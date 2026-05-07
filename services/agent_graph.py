@@ -10,6 +10,7 @@ START → supervisor_node → (conditional) → document_agent_node → END
 - general_agent_node : answers directly from the LLM; no vector lookup
 """
 
+import json
 import logging
 import operator
 from typing import Annotated
@@ -18,7 +19,7 @@ from typing_extensions import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from services.llm_chain import generate_rag_response, robust_llm
+from services.llm_chain import generate_rag_response, robust_llm, stream_rag_response
 from services.memory import get_chat_history, save_chat_history
 from services.vector_store import search_documents
 
@@ -269,3 +270,80 @@ async def run_agent(query: str, session_id: str) -> dict:
         "answer": final_state.get("answer", ""),
         "sources": final_state.get("retrieved_docs", []),
     }
+
+
+async def stream_agent(query: str, session_id: str):
+    """Stream the agent response as SSE-formatted data chunks.
+
+    Yields ``data: <json>\\n\\n`` strings for token / sources / done / error events.
+    Calls supervisor directly then dispatches to the appropriate streaming path,
+    avoiding the overhead of running through the full compiled graph.
+    """
+    from langchain_core.messages import HumanMessage
+
+    initial_state: AgentState = {
+        "messages": [],
+        "session_id": session_id,
+        "query": query,
+        "retrieved_docs": [],
+        "answer": "",
+        "route": "",
+    }
+
+    # Supervisor decides the route (fast, single LLM call)
+    supervisor_result = await supervisor_node(initial_state)
+    route = supervisor_result.get("route", "document_rag")
+
+    # ── Identity shortcircuit ────────────────────────────────────────────────
+    if route == "identity":
+        identity_answer = supervisor_result.get("answer", _IDENTITY_ANSWER)
+        yield f"data: {json.dumps({'type': 'token', 'content': identity_answer})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        return
+
+    # ── Document RAG ─────────────────────────────────────────────────────────
+    if route == "document_rag":
+        try:
+            chunks = await search_documents(query, namespace=session_id, top_k=8)
+        except ValueError as exc:
+            logger.error("[STREAM_AGENT] search_documents failed: %s", exc)
+            msg = "Document search is unavailable. Please check your Pinecone configuration."
+            yield f"data: {json.dumps({'type': 'token', 'content': msg})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            return
+
+        if not chunks:
+            msg = "Please upload a document first, then ask your question."
+            yield f"data: {json.dumps({'type': 'token', 'content': msg})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            return
+
+        async for token in stream_rag_response(query, chunks, session_id):
+            yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+
+        yield f"data: {json.dumps({'type': 'sources', 'sources': chunks})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        return
+
+    # ── General (no retrieval) ───────────────────────────────────────────────
+    chat_history = get_chat_history(session_id)
+    prompt_text = _GENERAL_PROMPT.format(chat_history=chat_history, query=query)
+
+    full_answer = ""
+    try:
+        async for chunk in robust_llm.astream([HumanMessage(content=prompt_text)]):
+            token: str = chunk.content if hasattr(chunk, "content") else str(chunk)
+            if token:
+                full_answer += token
+                yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+    except Exception as exc:
+        logger.exception("[STREAM_AGENT] General agent streaming failed: %s", exc)
+        error_msg = (
+            "The AI servers are currently at capacity. "
+            "Please try again after sometime."
+        )
+        yield f"data: {json.dumps({'type': 'token', 'content': error_msg})}\n\n"
+        full_answer = error_msg
+
+    save_chat_history(session_id, query, full_answer)
+    yield f"data: {json.dumps({'type': 'done'})}\n\n"

@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from dotenv import load_dotenv
 from langchain_core.prompts import PromptTemplate
@@ -21,12 +21,14 @@ _primary_llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     temperature=0.2,
     google_api_key=os.getenv("GOOGLE_API_KEY"),
+    streaming=True,
 )
 
 _fallback_llm = ChatGroq(
     model_name="llama-3.1-8b-instant",
     temperature=0.2,
     groq_api_key=os.getenv("GROQ_API_KEY"),
+    streaming=True,
 )
 
 # Primary with automatic fallback to Groq when Gemini rate-limits or errors.
@@ -142,3 +144,39 @@ async def generate_rag_response(
 
     save_chat_history(session_id, query, answer)
     return answer
+
+
+async def stream_rag_response(
+    query: str, retrieved_chunks: list[dict], session_id: str
+) -> AsyncGenerator[str, None]:
+    """Stream RAG response tokens one chunk at a time.
+
+    Yields plain text token strings. Saves full answer to history when done.
+    """
+    context_str = _format_chunks(retrieved_chunks)
+    chat_history = get_chat_history(session_id)
+    chain = _prompt | robust_llm
+
+    full_answer = ""
+    try:
+        async for chunk in chain.astream(
+            {
+                "chat_history": chat_history,
+                "context": context_str,
+                "question": query,
+            }
+        ):
+            token: str = chunk.content if hasattr(chunk, "content") else str(chunk)
+            if token:
+                full_answer += token
+                yield token
+    except Exception as exc:
+        logger.exception("[LLM STREAM] Streaming failed: %s", exc)
+        error_msg = (
+            "The AI servers are currently at capacity. "
+            "Please try again after sometime."
+        )
+        yield error_msg
+        full_answer = error_msg
+
+    save_chat_history(session_id, query, full_answer)

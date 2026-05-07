@@ -1,5 +1,6 @@
 import { Plus, Clock, FileText, Settings, HelpCircle, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { UserButton } from '@clerk/clerk-react'
 
 export default function Sidebar({
   documents,
@@ -28,27 +29,30 @@ export default function Sidebar({
     >
       {/* ── Logo ──────────────────────────────────────────────────────── */}
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #2A2A30', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            style={{
-              width: '36px', height: '36px',
-              backgroundColor: '#1A1A1F',
-              border: '1px solid #2A2A30',
-              borderRadius: '7px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ color: '#F4F4F5', fontSize: '16px', fontWeight: '700', letterSpacing: '-0.5px' }}>D</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '36px', height: '36px',
+                backgroundColor: '#1A1A1F',
+                border: '1px solid #2A2A30',
+                borderRadius: '7px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ color: '#F4F4F5', fontSize: '16px', fontWeight: '700', letterSpacing: '-0.5px' }}>D</span>
+            </div>
+            <div>
+              <p style={{ color: '#F4F4F5', fontSize: '14px', fontWeight: '600', lineHeight: '1.2', letterSpacing: '0.01em' }}>
+                DocuMind AI
+              </p>
+              <p style={{ color: '#71717A', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.12em', lineHeight: '1.5' }}>
+                Precision Intelligence
+              </p>
+            </div>
           </div>
-          <div>
-            <p style={{ color: '#F4F4F5', fontSize: '14px', fontWeight: '600', lineHeight: '1.2', letterSpacing: '0.01em' }}>
-              DocuMind AI
-            </p>
-            <p style={{ color: '#71717A', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.12em', lineHeight: '1.5' }}>
-              Precision Intelligence
-            </p>
-          </div>
+          <UserButton afterSignOutUrl="/" />
         </div>
       </div>
 

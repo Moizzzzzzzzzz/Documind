@@ -4,10 +4,11 @@ import uuid
 from pathlib import Path
 
 import boto3
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 from core.security import rate_limiter
+from services.auth import verify_clerk_token
 from services.ingestion import ingest_document
 from services.vector_store import create_index
 
@@ -39,9 +40,11 @@ async def _upload_to_s3(content: bytes, s3_key: str) -> None:
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
-    session_id: str = Form(...),
     _: None = Depends(rate_limiter),
+    user: dict = Depends(verify_clerk_token),
 ) -> JSONResponse:
+    namespace = f"user_{user['sub']}"
+
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided.")
 
@@ -73,10 +76,8 @@ async def upload_document(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"S3 upload failed: {e}")
 
-    # Upsert into the session-scoped namespace so vectors from other sessions
-    # never contaminate this conversation's search results.
     try:
-        await create_index(chunks, namespace=session_id)
+        await create_index(chunks, namespace=namespace)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Vector index error: {e}")
 
@@ -85,7 +86,7 @@ async def upload_document(
         "s3_key": s3_key,
         "chunk_count": len(chunks),
         "page_count": page_count,
-        "session_id": session_id,
+        "session_id": namespace,
         "message": (
             f"Successfully ingested '{file.filename}' into {len(chunks)} chunks "
             "and updated the vector index."

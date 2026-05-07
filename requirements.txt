@@ -30,6 +30,10 @@ boto3==1.35.0
 # Session store
 redis==5.2.1
 
+# Auth
+PyJWT[crypto]==2.9.0
+httpx>=0.28.1
+
 # Utilities
 python-dotenv==1.0.1
 python-multipart==0.0.20
