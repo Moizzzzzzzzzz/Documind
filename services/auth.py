@@ -9,10 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 security = HTTPBearer()
 CLERK_ISSUER = os.getenv("CLERK_ISSUER", "https://cute-escargot-85.clerk.accounts.dev")
 
-
-@lru_cache(maxsize=1)
 def get_jwks() -> dict:
-    """Fetch and cache Clerk JWKS — refreshes on process restart."""
     jwks_url = f"{CLERK_ISSUER}/.well-known/jwks.json"
     response = httpx.get(jwks_url, timeout=10)
     response.raise_for_status()
