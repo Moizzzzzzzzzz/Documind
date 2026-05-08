@@ -382,17 +382,25 @@ function DocuMindApp() {
           } else if (event.type === 'sources') {
             currentSourcesRef.current = event.sources
           } else if (event.type === 'done') {
+            const finalContent = streamingRef.current;
+            const finalSources = currentSourcesRef.current || [];
             setMessages((prev) => [
               ...prev,
               {
                 id: uuidv4(),
                 role: 'assistant',
-                content: streamingRef.current,
-                sources: currentSourcesRef.current,
+                content: finalContent,
+                sources: finalSources,
                 timestamp: new Date(),
               },
             ])
             if (activeDocument) setAnalysisPanelOpen(true)
+            setTimeout(() => {
+              setStreamingContent('');
+              streamingRef.current = '';
+              currentSourcesRef.current = [];
+              setIsStreaming(false);
+            }, 50);
             return
           } else if (event.type === 'error') {
             throw new Error(event.message)
